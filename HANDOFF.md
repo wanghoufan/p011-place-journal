@@ -3,8 +3,8 @@
 > **本文件为入口指针，权威收工快照在 `docs/handoff/HANDOFF.md` §0。** 2026-09-05 收工后，根目录本文件不再维护详细状态，避免两处真相。
 
 - **一句话**：移动优先的地点手账 PWA——拍照/写感受 → AI 整理入库 → 按地点/标签/时间回顾 → 自然语言找地点 → 分享快照。本地优先（IndexedDB）+ Supabase 云同步。
-- **当前状态（2026-09-07 在役）**：M0–M6 + 主题/分享长图/标签真删/Find 分离 + 删除链路根治 + 评分 5 档 + 现场建标签 + demo 三通道防上云；09-06/07 七批：灯箱相册、换设备远端图根治、同步可靠性（锁超时/毒丸停放/推拉解耦/结果可视化）、地点改名/搬家、感受与公开理由分框、Cover 自适应铺满、AI 连通性测试；录音/ASR 整条下线（改走微信语音输入）、封面 OCR 上线后又整条下线；S1/S2/L2_PASS/TAG_FIX_PASS/QA_V02_PASS/QA_Vercel_PASS_WITH_BLOCKED/QA第二轮P1_PASS；ENV-1 关闭；Docker 8081 与 Vercel 生产均上线（HEAD=origin/master=`d1b2e4b`）。详见 `docs/handoff/HANDOFF.md` §0。
-- **下一步**：高德 Key 联调（两端补变量）；历史验收标签清理待示下；QA 第二轮 P2/P3-2 重跑；P0 待真机三行。
+- **当前状态（2026-09-07，开发暂停）**：M0–M6 + 主题/分享长图/标签真删/Find 分离 + 删除链路根治 + 评分 5 档 + 现场建标签 + demo 三通道防上云；09-06/07 十一批：灯箱相册、换设备远端图根治、同步可靠性、地点改名/搬家、感受与公开理由分框、Cover 自适应铺满、AI 连通性测试、改名退回两轮修复（待验证）、高德 Key 两端已填（待目验）；录音/ASR 整条下线（改走微信语音输入）、封面 OCR 上线后又整条下线；S1/S2/L2_PASS/TAG_FIX_PASS/QA_V02_PASS/QA_Vercel_PASS_WITH_BLOCKED/QA第二轮P1_PASS；ENV-1 关闭；Docker 8081 与 Vercel 生产均上线（HEAD=origin/master=`67900b0`）。详见 `docs/handoff/HANDOFF.md` §0。
+- **下一步**：改名验证闭环；白边放大截图定责；高德两端目验；QA 第二轮 P2/P3-2 重跑；P0 待真机三行；历史验收标签清理待示下。
 - **路径变更**：数据库治理材料已迁至 `/Users/zzymima0000/Developer/coding/1.Active/alw丨数据库管理专家/`（`项目审查丨habit_tracker/` 与 `平台丨共享 Supabase 数据库/`），本文与 `docs/db/…`、`supabase/migrations/…` 旧路径一律以 alw 为准。
 
 ## 恢复工作步骤（智能体照做）

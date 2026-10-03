@@ -1,93 +1,29 @@
-# AGENTS.md｜ORCA（全员遵守，一页）
+# AGENTS.md — 个人打卡小工具（地点手账 PWA + 安卓 App）
 
-## 两阶段治理（固定 9+1＋1 专项，不再新增角色）
+<!-- ORCA-RULES-BLOCK:BEGIN -->
+<!-- 本区块由治理母版 scripts/sync-old-projects.sh 于 2026-09-29 注入；只增不删，可重复运行原地更新。 -->
+<!-- 本项目 AGENTS.md 的其余内容（项目专属规矩）保持原样，冲突时以本区块为准。 -->
+## ORCA 规则增量（母版 2026-09-29-产品验收）
 
-- 状态：`PLAN / WAITING_HUMAN_APPROVAL / DEVELOP / PLAN_REOPEN_REQUIRED`（仅Change C受控重开期间；`PROJECT_PHASE` 当前值以 HANDOFF 为准）。
-- Phase1（PLAN，用户口令`第一阶段，计划`）：只许 task-manager／supervisor／planner（Sol）／product-reviewer（显示名 Research Reviewer，内部 ID 不变，模型/通道以 override 表为准）；禁 builder／code-reviewer／qa 派工，禁业务代码改动，禁 Release。PLAN 链：Planner→Research Reviewer→Planner→…→Readiness Gate→Human Gate；用户不搬运反馈（TM 自动回传）；`PLAN_READINESS_SCORE>=90` 且模板 Gate 全条件满足（P0=0＋blocking P1=0＋关键事实已验证＋核心假设已合理验证）才进 WAITING（定义以 `docs/pm/PRODUCT_PLAN.template.md` 为准，卡内不另写）。
-- Human Gate：`WAITING_HUMAN_APPROVAL`（`PLAN_GATE=READY_FOR_HUMAN_REVIEW`）时 TM 停循环只找人一次，不可自动跨越，不可自行启动 builder；只有用户明确说`第二阶段，开发`才进 Phase2。
-- Phase2（DEVELOP）：锁定 `DEV_BASELINE=PRODUCT_PLAN_Vx.x`，默认主链 Builder→Reviewer→QA→Supervisor→TM（模型以 override 表为准）；禁随意改 Plan（Plan 变更只走 Change C Controlled Reopen＋Human Approval＋新版本＋新基线）；product-reviewer（Research Reviewer）默认不派，recorder/neat 只在收尾派。
-- Change Request（用户口令`变更请求：……`，TM 分类）：`CHANGE_REQUEST: NONE / A / B / C`——A=开发内小改留 DEVELOP 不召 Planner；B=局部功能变化更新局部 Requirement/DoD 留 DEVELOP 不召 Sol Planner；C=产品/架构变更进 `PLAN_REOPEN_REQUIRED`，局部暂停＋Sol Planner＋Research Reviewer＋Human Approval＋新 Plan 版本＋新 DEV_BASELINE 回 DEVELOP，不全量重跑。
-- 独立重申：task-manager（唯一对人说话）与 supervisor（只对编排者说话）保持独立，不合并；无 Spark Gate；无额度状态机字段。
-- 升级保留：同一 Task 累计被 supervisor 打回 2 次自动升 senior-expert（Sol），或编排者判定 P0-hard 手动升；senior 接手后被打回 2 次即停线找人（详见本文件升级节）。
+> 本区块只写**对外通用**的机制增量；派工细节见 `docs/roles/`，账本口径见下方条目。
 
-## 角色（9 常驻 + 1 升级专用，不再新增）
+- **产品验收（2026-09-28 定）**：开发完成的判断来自**用户可见要求的覆盖证据**，不只看单测／构建／代码审查／工具调用成功。
+  - 验收标准写在计划里：Phase1 给每条用户可见要求编一条可观察可测的**验收条目（AC）**，并标出**关键 AC**（对应 P0／blocking P1／核心用户路径／必要视觉交互呈现）；**关键 AC 集合不得为空**。
+  - 证据落 `docs/qa/` 的**产品验收追踪矩阵**（照 `docs/qa/BUGS.template.md` 同名节）。
+  - **不可放行三情形**（命中任一不得判 `PASS`）：①关键产品 DoD／AC 未测；②关键任务涉及的**每个**可见操作控件未实际点击并观察到页面／锚点／状态变化（只验 `href` 存在不算）；③验收证据缺失。
+  - 视觉验收最小覆盖：关键用户任务逐条走通、按项目要求检查桌面与窄屏、用边界样本（奇偶条目数／长标题长正文／空状态）检验对齐·换行·裁切·溢出·可读性、留真实浏览器截图。
+  - **用户签收**：发布类型为**首次发布**的，用户签收通过才算完成（签收前状态记未完成）；迭代更新与局部修复不强制签收。签收属 **Human Gate 范畴（用户参与）**，**不是新增 QA Gate**。
+- **体系更新三件套（2026-09-29 定）**：①本项目规则文件改动后与母版对齐（用 `bash scripts/sync-old-projects.sh` 或按《迁移整理提示词》取包，**备份不覆盖**）；②账本内容**不重写**（实绩历史），只做 schema 校验 `node scripts/model/check-ledger.mjs docs/model`（须 `LEDGER-OK`）；③**HANDOFF 记一行**。**老项目无两包概念，故母版的「同步两包＋更新对外概览」不适用。**
+- **派工跨目录禁令（2026-09-29 定）**：派 opencode 通道角色（supervisor／neat-freak／experience-recorder）时，任务里读写本仓以外目录（如 `/tmp`、`1.Active/` 等）会被 `external_directory` 权限自动拒、步骤静默失败，可能让角色误报已做也易反复盲试烧额度（禁盲试）；派单前处置二选一——①临时文件改到仓内已 gitignore 的 `temp/`，②先取得用户授权；codebuddy／codex 通道无此限制。
+- **红线（2026-09-29 增补）**：产品验收未落盘或关键 AC 未测、不得报完工/收工；首次发布未取得用户签收、不得报完工/收工。
+- **本项目迁移状态**：`docs/model/GOVERNANCE-STATE.json`（`rules_version`／`synced_at`／`project_phase_field`／`task_ledger_rows`／`agents_needs_manual_merge`／`product_acceptance_ac_added`）。
+- **存量项目待办（不自动做，需项目 TM 判断）**：本项目实绩 Plan 需补「视觉与交互验收标准（AC 编号）＋关键 AC 集合＋发布类型」，否则新规则下收尾会被判**计划缺项**；完成后把 `product_acceptance_ac_added` 置 `true`。
+<!-- ORCA-RULES-BLOCK:END -->
 
-task-manager=编排者（唯一对人说话）｜supervisor=监督者（只对编排者说话，编排者失联时除外）｜planner｜builder｜code-reviewer｜qa｜product-reviewer（显示名 Research Reviewer，内部 ID 不变）｜experience-recorder｜neat-freak｜senior-expert=高级开发（只接升级任务）｜db-admin=数据库管理员（专项，TM 直派直收，用户不中转）。职责看 `docs/roles/`，一句话一张。
-
-## 谁写哪（写错地方打回）
-
-| 谁 | 写哪 | 模板 |
-|---|---|---|
-| planner | `docs/pm/` | Phase1照PRODUCT_PLAN.template.md；Phase2照PLAN.template.md |
-| builder | 业务仓库本身 | — |
-| code-reviewer | `docs/review/` | CODE_REVIEW.template.md |
-| qa | `docs/qa/` | BUGS.template.md |
-| product-reviewer（Research Reviewer，ID 不变） | `docs/review/` | RESEARCH_REVIEW.template.md（Phase1；PRODUCT_BACKLOG.template.md 保留兼容） |
-| task-manager | `docs/handoff/` | HANDOFF.template.md |
-| supervisor | 无独立文档，打回写被检文件评论区 | — |
-| experience-recorder | `docs/handoff/DEV_EXPERIENCE.md`，按该文件九段式追加条目（本项目特例：无根 `经验一句话.md`，2026-09-19 定案；母版仍为根 `经验一句话.md`） | — |
-| neat-freak | 改对应 docs 原文+交接记一笔 | — |
-| db-admin | 平台审查仓（结论回执 TM 落 HANDOFF） | 照 supabase 规范 §16 三态＋§16.2 八字段＋§17 |
-| senior-expert | 业务仓库本身（只接升级任务） | — |
-
-业务文件（src/assets/配置/AGENTS.md/旧交接）原地不动；搬了会 broken 的留原地记映射。
-
-## 派工顺序（Phase-aware；旧单线默认链已废止）
-
-Phase1（PLAN）：planner（Sol）→product-reviewer（Research Reviewer）→planner→…→Readiness Gate→Human Gate（禁 builder／code-reviewer／qa／业务改动／Release）。Phase2（DEVELOP）：builder 写→code-reviewer 复核→qa 测→supervisor 复检→编排者收齐找人（默认主链，模型以 override 表为准；product-reviewer 默认不派）。真机QA每session先过能力预检PASS才进正式，否则停（详情见qa卡）。经验/neat-freak 只在收尾派一次。本窗口内派 subagent，全自动（默认派工口；执行通道按 override『执行通道/Runtime』列，表定通道（codex/opencode）的走通道直调，禁套娃）。三类例外（人肉调试/外部施工/迁移基线）可起终端，见编排者提示词 :10。基础设施活必带 docs/sop/ 对应规范（DB 带 supabase.md 或 sqlite.md，部署带 docker.md），supervisor 抽查。
-跳步：单文件小修可跳 planner/product，不可跳 code-reviewer+qa+supervisor；跳了记一句原因。分歧听谁的：技术分歧听 code-reviewer，范围分歧听 Task Manager。
-续 session：同一功能/Bug 链（开发→QA→返工→再 QA）尽量续上一个 session（codex/opencode 用 resume），不要每轮新开；返工派必须续。用完不急着关，关了重开更贵。resume 由派工基础设施保持，编排者不手动开终端；升级换 senior-expert 时开新链，不续旧 session。
-- External Builder Runtime 通用插座：builder 仍是 builder（9+1＋1 不新增），Runtime 仅为执行通道（本窗口 subagent / codex / opencode / External Runtime），由 override「执行通道/Runtime」列或口头指定、派工基础设施自动调用；Runtime 自带 internal reviewer/QA/self-check 仅为自检证据，不能替代 code-reviewer/qa/product-reviewer/supervisor；permission_request 走机器可读→ORCA/TM 审批单点→用户定→回 runtime，builder 不直聊用户；禁把通道角色包进本窗口subagent套娃调用（表定codex/opencode的角色必须走通道直调），违者打回。
-
-## 模型
-
-- 数据库审核（db-admin，专项，不占 Phase 主链）：TM 直派直收（审查材料→三态结论），结论记 HANDOFF，不经过 Human Gate；supervisor 抽查结论格式与三态口径。
-每次派前读根 `USER_MODEL_OVERRIDE.md`，有就用它（11行以表为准）。精确 ID，照抄执行（TM行例外：开窗口时定）。表内无备用列：换人用户直接改母版真源表；DISPATCH 的 used 恒填主，supervisor 抽查实派==表。换谁、用到几时，用户定。改表后必须真调验证可用才生效（烧额度先经用户批；只读验名免费先行，不通即停，表不动）。分工表软链制：各项目根表均为软链，指母版真源，改母版即全项目同步（禁拷实文件；跨机器断链时拷实文件并记 HANDOFF）。**本目例外（2026-09-18 用户令）**：本项目根表已转实文件（旧软链已删，备份 `USER_MODEL_OVERRIDE.md.旧版-2026-09-13`），软链制仅约束未转实文件的项目。
-
-## 升级（普通→高级，只对当次任务）
-
-- 触发：① 同一 Task 累计被 supervisor 打回 2 次自动升（QA 挂不算，只算 supervisor 打回） ② 编排者判定 P0-hard 手动升。满足一条即升。
-- 计数口径：rework=被 supervisor 打回次数；QA 挂/自修好不计数，不断链也累计。
-- 只升当次，不永久转正。换模型/换 Runtime 即开新链（旧链结论进 HANDOFF，缓存不跨链）。升级原因 + 返工次数记进任务账本。senior 接手后不再计数升级，被 supervisor 打回 2 次即停线找人（列阻塞＋要拍的板，不再升，无更高角色）。
-- senior 模型读 `USER_MODEL_OVERRIDE.md` 的 senior-expert 行。
-
-## 任务账本（换模型的依据，一个项目一个文件）
-
-- 文件：`docs/model/TASK-MODEL-LOG.jsonl`，一行一任务，跨项目同名同 schema，分析时拼起来直接统计。模板自带的 `{"_example":true}` 行不参与统计，首个真实任务前删除。example 行由迁移整理工/首个 TM 在首个真实任务前删除。
-- schema（全单行，枚举锁死：11 必需键＋note 可选扩展键）：`{"task","project","date","role","model","result":"PASS/FAIL","rework":数字,"escalated":"YES/NO","escalation_reason":null或一句,"tokens":数字或null,"cost_cny":数字或null,"note":可选}`。`cost_cny` 与 `tokens` 拿不到填 `null`，不许编；`project`=仓库根目录名（HANDOFF Stage ID 括号备注，如 radar-live），`date` 取 `YYYY-MM-DD`。
-- 分工：builder/senior 写一行初版→supervisor 校验 JSON 合法+返工数→编排者判结果落盘。
-- `result`=任务级 PASS/FAIL（按表派单成功仍可 PASS；FAIL 须配 escalation_reason/备注说明是任务挂还是模型挂）。
-- 逐派记录：每次派工收工编排者往 `docs/model/DISPATCH-LOG.jsonl` 记一行（schema：date/task/role/model/used恒填主/runtime（本窗口/codebuddy/codex/opencode/—）/result PASS或FAIL/note；示例行不参与统计，首个真实派前删除；tokens/cost不记；寿命随任务账本归档）；与派工显式两行互验；supervisor抽查实派==表三处对得上。
-- 两包同步：母版治理改动提交后同步两本地包（`新项目模板包/`、`老项目迁移模板包/`）并在 HANDOFF 记一行；`diff` 非预期差零容忍（常驻同步，用户定）。
-- 换模型决策先读账本：返工多、常升级的任务类型优先换强模型。
-
-## 缓存五条（各家通用，够用就行；本窗口 subagent 链适用，External Runtime 走 builder 通道，换 Runtime/换模型/升级即开新链，见编排者 :10-11；外部施工见外部提示词）
-
-- 静态打头：派工先读同一批文件，顺序全体系唯一：AGENTS→角色卡→override 表→HANDOFF→经验文档（本项目＝`docs/handoff/DEV_EXPERIENCE.md`）→（涉基础设施加 docs/sop/ 对应规范）→任务目标放最后。prefix 稳定命中，谁也不许自创顺序。
-- 动态押后：任务目标、git 状态、时间戳、随机 ID 永远放最后，system prompt 前面只放不变的东西。
-- 同链续 session：一链之内不换派工基础设施与会话链（角色/工具按任务换，prompt 模板不变）；要换基础设施即开新链重起。
-- 长了就压：超约 100k token（编排者估，用户可改）即写 HANDOFF 快照后开新链，旧链结论进 HANDOFF，历史扔掉。
-- 缓存 best-effort，几小时到几天过期正常，不定 KPI，只定动作。
-
-## 红线
-
-- P0 没完+人没喊停，不准收工，不准“先到这里”。
-- 每轮末三行心跳：目标/剩 P0/下一步。
-- 不 push（commit 需编排者明确指令，含分支名，外部者用 `ext/` 开头）；不碰 secrets；不改旧版封存；`docs/sop/` 为基础设施规范位（docker.md/supabase.md/sqlite.md，去版本号引用），新项目自建（包内历史交接不动）。
-- 换模型的事用户决策，不许自作主张、不许写恢复类条件。
-- 总监督（体系外独立，不占9+1，编排者无权派工/解雇）：只读 AGENTS＋`docs/prompts/Orca 编排治理监督者提示词.md`（先读顶部收编说明，wake-only）＋HANDOFF 并按监督者提示词执行，监督编排者是否持续推进、防停摆；平时只喊编排者，禁主动问用户，同一停摆两次叫不醒才找用户一次；与体系内 supervisor（监督者）无关，不合并；质量判定走 supervisor 链，推进/停摆判定听总监督。
-
----
-
-## 本目原有规则（迁移自旧 AGENTS.md）
-
-> 以下为本项目旧 AGENTS.md 原文，原样附录（备份见 AGENTS.md.旧版-2026-09-13），新会话以新版正文为准，本节为项目专属补充。
-
-# AGENTS.md — 个人打卡小工具（地点手账 PWA）
 
 > 下次会话恢复上下文的唯一规则入口（≤60 行）。详述见 `docs/handoff/HANDOFF.md` §0 与 `README.md`。
 
-**一句话定位**：移动优先的地点手账 PWA——拍照/写感受 → AI 整理入库 → 按地点/标签/时间回顾 → 自然语言找地点 → 分享快照。本地优先（IndexedDB）+ Supabase 云同步。
+**一句话定位**：移动优先的地点手账——**PWA（`src/`）+ 安卓 App（`mobile/`）双端**：拍照/写感受 → AI 整理入库 → 按地点/标签/时间回顾 → 自然语言找地点 → 分享快照。PWA 本地优先（IndexedDB）+ Supabase 云同步；安卓本地 expo-sqlite + 复用同一 Supabase（`habit_tracker`）。
 
 **怎么跑起来**
 ```bash
@@ -95,20 +31,27 @@ npm install
 npm run dev        # http://localhost:5173  改 .env.local 后需重启 vite
 npm run build && npm run preview -- --port 4175
 ```
-Node: `/Users/zzymima0000/.workbuddy/binaries/node/versions/22.22.2-3/bin/node`（2026-09-20 实测更正：本节旧写 `-2`，该目录不存在）；端口约定 5173/4175/8081，勿占 3000/3100。
+Node: `/Users/zzymima0000/.workbuddy/binaries/node/versions/22.22.2-2/bin/node`；端口约定 5173/4175/8081，勿占 3000/3100。
 
 **技术栈**：React 18 + TS 5 + Vite 5 + Tailwind + vite-plugin-pwa；IndexedDB(via idb) + outbox 同步引擎；Supabase JS (`habit_tracker` schema, `table()` helper)；Vercel Functions (`api/`，现仅 `ai-organize`)；高德 JS API / OpenRouter|DeepSeek|OpenCode（三适配器，`OPENCODE_MODEL=glm-5.3-flash`）。录音/ASR 与封面 OCR 已按用户决定整条下线。
 
 **目录与约定**
 - `src/lib/sync.ts` 唯一同步引擎（revision 乐观锁、`ensureTags/PlacesInCloud`、`sweepDirtyRows`、`pullRemote` 保护 outbox）；`src/lib/supabase.ts` 固定 `DB_SCHEMA='habit_tracker'`；`src/lib/idb.ts` 本地库；新增 `theme.ts`（暖纸/票根/竹青）、`shareCard.ts`（canvas 长图，感受永不出卡）、`uuid.ts`（http 局域网 polyfill）；`scripts/deploy.sh` 规范部署（Docker V1.1）。
-- `docs/handoff/HANDOFF.md` §0 为现役收工快照（2026-09-07 在役）；`docs/acceptance-l2/`、`docs/qa/`、`docs/db/ENV1-实测记录丨2026-09-04.md` 为证据；数据库治理权威在 `alw丨数据库管理专家/项目审查丨habit_tracker/`。
+- `docs/handoff/HANDOFF.md` §0 为现役收工快照（2026-10-02 在役：安卓端恢复出包装真机、分支站错位待归位、tab 图标待用户拍板）；`docs/acceptance-l2/`、`docs/qa/`、`docs/db/ENV1-实测记录丨2026-09-04.md` 为证据；数据库治理权威在 `alw丨数据库管理专家/项目审查丨habit_tracker/`。
 - 全部查询走 `supabase.schema('habit_tracker')`；禁止业务表进 `public`、禁止整库回写、禁止 `service_role` 进前端/Git。
 
+**安卓端与分支纪律（2026-10-02 补，必读）**
+- **本仓是双端**：`src/`＝PWA；`mobile/`＝安卓 App（Expo SDK 57 / RN 0.86.3 / expo-router 57，`mobile/android/` 为 Gradle 工程）。PWA 代码里找不到安卓功能不是"没有"，是**看错了分支**。
+- **一上手必须先查分支**：`master`(=`67900b0`, 09-06) 落后 25 个提交、分叉点就是它自己、无任何独有提交；安卓端工作**从未合进 master**，最新在 `wanghoufan/master`(=`b031fcc`, 09-22)，比 `origin/master`(=`d83d61d`) 多 1 个未推送提交。查任何"某分支有没有某目录"一律用 `git ls-tree -r <branch> -- <path>`，**禁止拿当前分支的结论代替全部分支**。
+- **`stash@{0}` 是旧版**（"Recovered Playground worktree 011 2026-10-01"，内容更旧：app 名还是「私人打卡手账」）。判断新旧必须 **diff 内容**，不看提交日期或信息。注意 `git diff <ref> -- <path>` 方向是 `<ref> → 工作区`，**`-` 侧才是 `<ref>` 的内容**。
+- **搬目录／恢复代码前必查三处忽略**：`.gitignore`、**`.git/info/exclude`（本地排除、不随仓库走，最易漏）**、`git ls-tree -r <branch>` 实查分支。`mobile/android/` 目前被 `.git/info/exclude:9` 排除、任何分支 0 提交，是安卓端唯一未备份部分。
+- **出包／装机**：自用一律 `./gradlew assembleRelease`（release 变体本就签 `debug.keystore`，合法）；**debug 包不含 bundle，装上必黑屏**。SDK 在 `~/android-toolchain/sdk`（非 `~/Library/Android/sdk`），4 个 ABI 约 5–6 分钟，别当卡死。Docker 占用 8081/8082 **不得关闭**，Metro 一律 8083 + `adb reverse tcp:8081 tcp:8083`。**装完必须独立验证**：停 Metro + `adb reverse --remove-all` + 重启 app。
+- **缺字形类 UI 问题**：`mobile/app/(tabs)/_layout.tsx` 从未写 `tabBarIcon`，expo-router 会渲染内置占位符 `⏷`(U+23F7, `MissingIcon.js`)；两台机器因字体 fallback 不同会一台空白一台豆腐块，**同一 APK、同一 UI 树，不是版本分裂**。用 `uiautomator dump` 看 `text=` 暴露占位字符，比截图放大快。
+- **验收纪律**：用户报"UI/软件不一样"，先证伪版本分裂再解释——比对各机 `pm path`+`md5sum`、`uiautomator dump` 比节点结构，最后才找原因。**改动用户可见呈现前先 dump 一遍基线**，别装完才报。
+
 **当前状态与下一步**
-- 已完成（2026-09-07）：M0–M6 + 主题系统 + 分享长图/卡片图 + 标签真删 + Find 分离；S1（`20260903141849`）/S2/L2_PASS/TAG_FIX_PASS/QA_V02_PASS/QA_Vercel_PASS_WITH_BLOCKED；ENV-1 已关闭；ASR 真转写曾PASS后整条下线（改走微信语音输入）；AI（`glm-5.3-flash`，12s 降级保留）全通；Docker 8081 已上线（healthy）；Vercel 生产 `https://place-journal-xi.vercel.app` 已上线+验收；09-06/07 七批：灯箱相册＋换设备远端图根治＋同步可靠性（锁超时/毒丸停放/推拉解耦/结果可视化）＋地点改名/搬家（QA第二轮P1_PASS）＋感受与公开理由分框＋Cover自适应铺满＋AI连通性测试；封面OCR曾上线后因GLM单次8–17s整条下线（该快照当时 HEAD=origin/master=`d1b2e4b`，2026-09-07 验证；此值已过时，现役 HEAD 一律以 `git log` 为准）。09-20：TASK-DEV-14（首次绑定确认UI＋退出/文案/mismatch；回归260全绿＋真机①②③PASS，mismatch端到端记边界）＋TASK-DEV-15（双机分发）＋TASK-PWA-01（PWA-AI三件套：洗感受/筛标签/公开理由，summary退役）收工；均未 commit/push。
-- 待办：T062 收口判定（绑定/退出两项真机已PASS，mismatch端到端因同步引擎未接线记边界）；之后 P2-1/P2-2/P2-3、AI 真整理、分享真云发布；高德 Key 联调（Vercel/8081 两端补变量）；历史验收标签清理待示下；QA第二轮 P2/P3-2 重跑；L3 并发验收仍取消，但双端日常使用已成主要场景。
+- 已完成（2026-09-07，开发暂停）：M0–M6 + 主题系统 + 分享长图/卡片图 + 标签真删 + Find 分离；S1（`20260903141849`）/S2/L2_PASS/TAG_FIX_PASS/QA_V02_PASS/QA_Vercel_PASS_WITH_BLOCKED；ENV-1 已关闭；ASR 真转写曾PASS后整条下线（改走微信语音输入）；AI（`glm-5.3-flash`，12s 降级保留）全通；Docker 8081 已上线（healthy）；Vercel 生产 `https://place-journal-xi.vercel.app` 已上线+验收；09-06/07 十一批：灯箱相册＋换设备远端图根治＋同步可靠性（锁超时/毒丸停放/推拉解耦/结果可视化/上传拉取分段超时）＋地点改名/搬家（QA第二轮P1_PASS）＋感受与公开理由分框＋Cover自适应铺满＋AI连通性测试＋改名退回两轮修复（待验证）＋高德Key两端已填（待目验）；封面OCR曾上线后因GLM单次8–17s整条下线；白边争议待放大截图定责（HEAD=origin/master=`67900b0`，2026-09-07 验证一致）。
+- 待办：历史验收标签清理待示下；QA第二轮 P2/P3-2 重跑；P0 待真机三行；改名验证闭环；白边放大截图；高德两端目验；Tencent残留Key清理；L3并发验收仍取消，但双端日常使用已成主要场景。
 - 硬守则：未明确确认禁 `git commit/push`（push 二次确认）；未授权禁动 `Services/`/`DockerData/`/`DockerBackups`；`VITE_*` 改动必重建镜像；密钥只进 `.env.local` / Vercel 变量。
-- 硬守则（2026-09-20 用户令，E-002）：修完默认推＋发（commit＋push＋Vercel 发版），亲自线上＋真机实测刚改功能，有问题迭代至解决；用户验收仍有问题时不算完工。
-- 硬守则（2026-09-21 用户令）：需用户填 Key 时，先给准确匹配的官方获取链接；建完整配置文档、该填的全填好，只空 Key；Key 字段放文档最底部加一眼可见标记；打开文档让用户填存，不让用户到处找。（与上方禁commit条并存：无当次明确指令默认禁，有明确修完即推令则按E-002执行。）
 
 **恢复必读**：`docs/handoff/HANDOFF.md` §0 → `README.md` → `docs/V1_PRODUCT_AND_TECHNICAL_PLAN.md` → `.workbuddy/memory/2026-09-05.md`（09-05 全日总结；09-03/09-01 为历史）
