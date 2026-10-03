@@ -42,4 +42,6 @@ example
 
 # generated native folders
 /ios
-/android
+# 2026-10-03 移除 `/android`：本项目的安卓原生壳是**手写并入库**的（Playground 目录删除事故后
+# `mobile/android/` 一度 0 提交，是安卓端唯一未备份部分）。构建产物由 `android/.gitignore`
+# 自己覆盖（build/ .gradle .kotlin local.properties .cxx/ *.jsbundle）。
