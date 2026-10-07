@@ -6,6 +6,12 @@
 
 线上地址：https://place-journal-xi.vercel.app（手机浏览器打开即可用，也可“添加到主屏幕”当 App 用）
 
+<p>
+  <img src="docs/screenshots/screen-01-home-gallery.png" alt="画廊首页：演示数据的地点卡片" width="200" />
+  <img src="docs/screenshots/screen-02-find.png" alt="找地点：自然语言搜索与条件筛选" width="200" />
+  <img src="docs/screenshots/screen-03-tags.png" alt="标签与维度管理页" width="200" />
+</p>
+
 ## 这是什么
 
 这是一个手机优先的私人地点手账（PWA，即能安装到手机主屏幕的网页应用）：每次去一个地方，拍几张照片、写下感受，应用会帮你按地点、标签、时间整理好。以后想找“那家很安静的咖啡馆”，直接用一句话搜出来；想分享某次行程，可以生成一张分享卡或链接，私密感受不会被带出去。

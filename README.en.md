@@ -6,6 +6,12 @@
 
 Live site: https://place-journal-xi.vercel.app (open in a mobile browser; use "Add to Home Screen" to install it as an app)
 
+<p>
+  <img src="docs/screenshots/screen-01-home-gallery.png" alt="Home gallery: place cards with demo data" width="200" />
+  <img src="docs/screenshots/screen-02-find.png" alt="Find places: natural-language search and filters" width="200" />
+  <img src="docs/screenshots/screen-03-tags.png" alt="Tags and dimensions management page" width="200" />
+</p>
+
 ## What is this
 
 A mobile-first private place journal (PWA, a web app you can install to your phone's home screen). Each time you visit a place, add a few photos and some notes, and the app organizes everything by place, tag, and time. Later, find "that quiet cafe" with a plain sentence; share a trip as a card or link without leaking private notes.
