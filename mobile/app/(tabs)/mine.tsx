@@ -28,11 +28,11 @@ import { appVersionLabel, formatDateTime } from '@/features/format'
 import { readExportBundle, toExportCsv, toExportJson, type ExportFile } from '@/features/export'
 import { shareExportFile } from '@/features/exportFile'
 import { probeAiConfig, testAiConnectivity } from '@/features/aiProbe'
-import { APP_THEMES, colors, type AppTheme, type Palette } from '@/theme'
+import { APP_THEMES, APPEARANCE_OPTIONS, colors, type Appearance, type AppTheme, type Palette } from '@/theme'
 import { useTheme } from '@/themeProvider'
 
 export default function MineScreen() {
-  const { palette, theme, setTheme } = useTheme()
+  const { palette, theme, appearance, setTheme, setAppearance } = useTheme()
   const styles = useMemo(() => makeStyles(palette), [palette])
 
   const [summary, setSummary] = useState<SyncSummary | null>(null)
@@ -383,7 +383,25 @@ export default function MineScreen() {
             </Pressable>
           ))}
         </View>
-        <Text style={styles.hint}>切换立即生效并记住选择；导航栏与「画廊 / 发现 / 我的」三页配色随主题换装。</Text>
+        <Text style={styles.lineLabel}>明暗</Text>
+        <View style={styles.appearanceRow}>
+          {APPEARANCE_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.id}
+              accessibilityRole="button"
+              accessibilityState={{ selected: appearance === opt.id }}
+              onPress={() => setAppearance(opt.id as Appearance)}
+              style={[styles.appearanceOption, appearance === opt.id && styles.appearanceOptionActive]}
+            >
+              <Text style={[styles.appearanceText, appearance === opt.id && styles.appearanceTextActive]}>
+                {opt.name}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.hint}>
+          明暗三态默认「跟随系统」，可改浅色/深色；切换立即生效并记住选择，导航栏与各页配色随之换装。
+        </Text>
       </Card>
 
       <Card style={styles.section}>
@@ -548,6 +566,18 @@ function buildStyles(colors: Palette) {
     themeSwatch: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: colors.line },
     themeName: { fontSize: 12, color: colors.inkMuted },
     themeNameActive: { color: colors.terra, fontWeight: '700' },
+    appearanceRow: { flexDirection: 'row', gap: 10 },
+    appearanceOption: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.line,
+      alignItems: 'center',
+    },
+    appearanceOptionActive: { borderColor: colors.terra, backgroundColor: colors.terraSoft },
+    appearanceText: { fontSize: 13, color: colors.inkMuted },
+    appearanceTextActive: { color: colors.terraDeep, fontWeight: '700' },
     buildMark: { textAlign: 'center', fontSize: 10, color: colors.inkMuted, paddingBottom: 4 },
   })
 }

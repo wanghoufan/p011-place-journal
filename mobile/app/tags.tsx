@@ -23,6 +23,7 @@ import { listTagsGrouped, tagUsageWithChildren, type TagGroup, type TagWithUsage
 import { createDimension, createTag, deleteTag, renameTag } from '@/features/recordActions'
 import { dimensionKindLabel } from '@/features/format'
 import { colors } from '@/theme'
+import { themedStyles } from '@/theme'
 
 interface AddTarget {
   dimensionId: string
@@ -288,7 +289,7 @@ function deleteMessage(target: TagWithUsage | null, groups: TagGroup[]): string 
   return parts.join('')
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
   container: { padding: 16, gap: 14, paddingBottom: 48 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
@@ -304,4 +305,4 @@ const styles = StyleSheet.create({
   menuDots: { fontSize: 20, color: colors.inkMuted, lineHeight: 22 },
   muted: { fontSize: 12, color: colors.inkMuted },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingLeft: 4 },
-})
+}))

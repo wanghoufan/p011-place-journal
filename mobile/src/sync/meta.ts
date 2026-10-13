@@ -15,6 +15,7 @@ export type MetaKey =
   | 'parked_ops'
   | 'demo_seeded'
   | 'app_theme'
+  | 'app_appearance'
   | 'gallery_layout'
 
 export interface SyncResult {

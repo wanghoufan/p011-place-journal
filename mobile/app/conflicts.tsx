@@ -10,6 +10,7 @@ import { resolveConflict, type ConflictRow } from '@/sync/conflicts'
 import { describeConflict, listOpenConflictRows } from '@/features/status'
 import { formatDateTime, truncate } from '@/features/format'
 import { colors } from '@/theme'
+import { themedStyles } from '@/theme'
 
 export default function ConflictsScreen() {
   const [rows, setRows] = useState<ConflictRow[]>([])
@@ -135,7 +136,7 @@ function summarize(snapshot: string | null, fallback: string): string {
   }
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.paper },
   container: { padding: 16, gap: 14, paddingBottom: 48 },
   section: { gap: 10 },
@@ -148,4 +149,4 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 10 },
   flex: { flex: 1 },
   mergeLink: { fontSize: 13, color: colors.terraDeep, textAlign: 'center' },
-})
+}))

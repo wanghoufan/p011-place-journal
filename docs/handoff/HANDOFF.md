@@ -89,6 +89,20 @@ APK 产物路径：`mobile/android/app/build/outputs/apk/release/app-release.apk
 
 **④ push**：`wanghoufan/master` 已推 `origin`（详见 §0.B 表）。
 
+### 0.A.5 2026-10-13 轮：同步链路修复 ＋ 云端照片下行 ＋ 暗色模式（单智能体，收工）
+
+> 用户口令「你是唯一开发者」（单智能体模式）。本轮改动**仅 `mobile/`**（＋本节与 README 还原），已 push `master`（commit 见 Git）。设备：Note 12T Pro（`UKCESWB67PUO7LPB`）。
+
+- **同步上传链路四修**（此前「待上传 N 项、上传成功 0 / 停放」的根因，均在 `mobile/src/sync/`）：
+  ① `push.ts`：父 op 成功即从 outbox 删除后，子 op 跨轮不再误判「缺父」把整批卡死；
+  ② `supabaseTransport.ts`：entries 封面外键——封面 media 未上云时先按空封面推、`upload_media` 传完再回填；`entry_tags` 云端**无 `id` 列**，改按 `entry_id,tag_id` 复合键，并在推标签前补齐标签/维度（对齐 Web `ensureTagsInCloud`）；
+  ③ `pull.ts`：标签按父链深度落盘（修复本地 `tags.parent_id` 自引用外键）。
+- **云端照片下行（新增 `sync/pullMedia.ts`）**：拉 `media` 行 + 签名 URL 下载 display/缩略图到本机持久目录（离线可看）；网关加 `createSignedUrl`、`MediaFileSystem.writeBytes`；`Mine` 停放区加「重试停放项」。
+- **暗色模式**：`theme.ts` 加单一深色调色板 + 明暗三态（浅色/深色/跟随系统，默认跟随系统）；`colors` 改活对象 + `themedStyles` 工厂，全站 16 文件接入主题；`Mine` 加「明暗」选择器；根布局 StatusBar 随明暗。
+- **Find 页切换闪退修复**：清单/画廊两个 FlatList 加不同 `key`（修 `numColumns` 就地变更的 Invariant）。
+- **验证**：`tsc` 干净、单测 **411 全绿**；Note 12T Pro 真机实测：上传/拉取/照片显示/明暗三态/跟随系统/重启保持偏好/数据完好。
+- **洁癖（小清理）**：还原被治理同步误覆盖的 `README.md`（曾被写成 ORCA 模板分发版 README）；删除会话与治理同步产生的 `*.旧版-2026-10-*` 未跟踪备份。
+
 ### 0.B 下一步任务（按优先级）
 
 | # | 任务 | 状态／说明 |

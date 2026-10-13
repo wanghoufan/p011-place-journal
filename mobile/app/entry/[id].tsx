@@ -45,6 +45,7 @@ import {
 } from '@/features/recordActions'
 import { createEntryShare } from '@/features/shares'
 import { colors } from '@/theme'
+import { themedStyles } from '@/theme'
 
 export default function EntryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -440,7 +441,7 @@ export default function EntryDetailScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   // screen 供 ScrollView 铺底；grow 只留给子元素撑满（按钮），不带背景，避免盖掉 variant 底色。
   screen: { flex: 1, backgroundColor: colors.paper },
   grow: { flex: 1 },
@@ -492,4 +493,4 @@ const styles = StyleSheet.create({
   summary: { fontSize: 15, fontWeight: '700', color: colors.ink, borderLeftWidth: 3, borderLeftColor: colors.terra, paddingLeft: 10 },
   body: { fontSize: 15, color: colors.ink, lineHeight: 22, marginTop: 2 },
   actions: { flexDirection: 'row', gap: 10 },
-})
+}))

@@ -17,6 +17,7 @@ import {
 import { Image } from 'expo-image'
 
 import { colors } from '../theme'
+import { themedStyles } from '../theme'
 
 export function Lightbox({
   visible,
@@ -129,7 +130,7 @@ export function Lightbox({
   )
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)' },
   topBar: {
     flexDirection: 'row',
@@ -172,4 +173,4 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 20 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.4)' },
   dotActive: { width: 18, backgroundColor: colors.white },
-})
+}))

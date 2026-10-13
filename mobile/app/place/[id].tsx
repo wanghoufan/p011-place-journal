@@ -21,6 +21,7 @@ import { formatVisitDate, relativeDayChip } from '@/features/format'
 import { getPlaceDetail, type PlaceDetail } from '@/features/queries'
 import { deletePlace, updatePlace } from '@/features/recordActions'
 import { colors } from '@/theme'
+import { themedStyles } from '@/theme'
 
 export default function PlaceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -171,7 +172,7 @@ export default function PlaceDetailScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   // screen 供 ScrollView 铺底；grow 只留给子元素撑满（按钮），不带背景，避免盖掉 variant 底色。
   screen: { flex: 1, backgroundColor: colors.paper },
   grow: { flex: 1 },
@@ -204,4 +205,4 @@ const styles = StyleSheet.create({
   timelineBody: { flex: 1, gap: 3 },
   timelineNote: { fontSize: 13, color: colors.ink },
   timelineFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
-})
+}))

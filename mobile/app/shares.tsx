@@ -10,6 +10,7 @@ import { formatDateTime } from '@/features/format'
 import { listShareSnapshots, type ShareSnapshotSummary } from '@/features/queries'
 import { revokeShare } from '@/features/shares'
 import { colors } from '@/theme'
+import { themedStyles } from '@/theme'
 
 const KIND_LABEL: Record<ShareSnapshotSummary['kind'], string> = {
   single: '单条',
@@ -136,7 +137,7 @@ export default function SharesScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
   container: { padding: 16, gap: 12, paddingBottom: 48 },
   header: { gap: 6, marginBottom: 4 },
@@ -162,4 +163,4 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '700' },
   badgeTextActive: { color: colors.moss },
   badgeTextRevoked: { color: colors.inkMuted },
-})
+}))

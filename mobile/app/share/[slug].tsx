@@ -12,6 +12,7 @@ import { formatDateTime, truncate } from '@/features/format'
 import { getShareSnapshotBySlug, type ShareSnapshotDetail } from '@/features/queries'
 import { revokeShare } from '@/features/shares'
 import { colors } from '@/theme'
+import { themedStyles } from '@/theme'
 
 export default function ShareSingleScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>()
@@ -140,7 +141,7 @@ export default function ShareSingleScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
   container: { padding: 16, gap: 14, paddingBottom: 48 },
   section: { gap: 8 },
@@ -164,4 +165,4 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '700' },
   badgeTextActive: { color: colors.moss },
   badgeTextRevoked: { color: colors.inkMuted },
-})
+}))

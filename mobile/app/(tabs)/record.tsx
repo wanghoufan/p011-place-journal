@@ -36,6 +36,7 @@ import { listPlaceOptions, listTagsGrouped, type PlaceOption, type TagGroup } fr
 import { todayIso, parseOptionalBudget } from '@/features/format'
 import { createTagNamed, saveRecord } from '@/features/recordActions'
 import { colors } from '@/theme'
+import { themedStyles } from '@/theme'
 
 const MAX_PHOTOS = 9
 
@@ -476,7 +477,7 @@ export default function RecordScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   // screen 供 ScrollView 铺底；grow 只留给子元素撑满（按钮），不带背景，避免盖掉 variant 底色。
   screen: { flex: 1, backgroundColor: colors.paper },
   grow: { flex: 1 },
@@ -529,4 +530,4 @@ const styles = StyleSheet.create({
   },
   removeText: { color: colors.white, fontSize: 12, lineHeight: 14 },
   photoActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-})
+}))

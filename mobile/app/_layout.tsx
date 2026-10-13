@@ -22,7 +22,7 @@ export default function RootLayout() {
 }
 
 function RootNavigator() {
-  const { palette } = useTheme();
+  const { palette, scheme } = useTheme();
   useEffect(() => {
     let disposed = false;
     let dispose: (() => void) | null = null;
@@ -56,7 +56,7 @@ function RootNavigator() {
 
   return (
     <>
-      <StatusBar style="auto" />
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <View style={{ flex: 1, backgroundColor: palette.paper }}>
         <Stack screenOptions={{ contentStyle: { backgroundColor: palette.paper } }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

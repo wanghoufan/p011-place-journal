@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 
 import { colors, TOUCH_HEIGHT } from '../theme'
+import { themedStyles } from '../theme'
 import { syncLabel, syncTone, type SyncStatusLike } from '../features/format'
 
 export function Card({ children, style }: { children: ReactNode; style?: object }) {
@@ -71,31 +72,31 @@ export function AppButton({
   )
 }
 
-const variantStyles: Record<ButtonVariant, object> = {
+const variantStyles = themedStyles((): Record<ButtonVariant, object> => ({
   primary: { backgroundColor: colors.terra },
   secondary: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line },
   danger: { backgroundColor: colors.danger },
   ghost: { backgroundColor: 'transparent' },
-}
+}))
 // 禁用态用实色 + 不透明文字：不给整体加 opacity，否则白字会跟底色一起变淡而看不清。
-const variantDisabledStyles: Record<ButtonVariant, object> = {
+const variantDisabledStyles = themedStyles((): Record<ButtonVariant, object> => ({
   primary: { backgroundColor: colors.terraDeep },
   secondary: { backgroundColor: colors.cardDeep },
   danger: { backgroundColor: colors.dangerSoft },
   ghost: { backgroundColor: 'transparent' },
-}
-const variantDisabledTextStyles: Record<ButtonVariant, object> = {
+}))
+const variantDisabledTextStyles = themedStyles((): Record<ButtonVariant, object> => ({
   primary: { color: colors.white },
   secondary: { color: colors.inkMuted },
   danger: { color: colors.danger },
   ghost: { color: colors.inkMuted },
-}
-const variantTextStyles: Record<ButtonVariant, object> = {
+}))
+const variantTextStyles = themedStyles((): Record<ButtonVariant, object> => ({
   primary: { color: colors.white },
   secondary: { color: colors.ink },
   danger: { color: colors.white },
   ghost: { color: colors.terraDeep },
-}
+}))
 
 export function Chip({
   label,
@@ -367,7 +368,7 @@ export function ConfirmDialog({
   )
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   card: {
     backgroundColor: colors.card,
     borderRadius: 16,
@@ -463,4 +464,4 @@ const styles = StyleSheet.create({
   modalMessage: { fontSize: 14, color: colors.inkMuted, lineHeight: 21 },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   modalButton: { flex: 1 },
-})
+}))

@@ -28,6 +28,7 @@ import { parseOptionalBudget, todayIso } from '@/features/format'
 import { AI_API_TIMEOUT_MS, runOrganise, type OrganiseSuggestion } from '@/features/organise'
 import { createTagNamed, saveRecord } from '@/features/recordActions'
 import { colors } from '@/theme'
+import { themedStyles } from '@/theme'
 
 type Phase = 'input' | 'organising' | 'review' | 'skipped'
 
@@ -431,7 +432,7 @@ export default function AiConfirmScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.paper },
   container: { padding: 16, gap: 14, paddingBottom: 48 },
   section: { gap: 12 },
@@ -449,4 +450,4 @@ const styles = StyleSheet.create({
   unmatchedBlock: { gap: 8, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 10 },
   unmatchedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   unmatchedActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-})
+}))
