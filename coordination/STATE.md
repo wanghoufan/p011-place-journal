@@ -1,3 +1,101 @@
+# Coordination STATE 丨 L3 产品审查 Run（2026-10-13）
+
+> 本节为最新一轮记录（2026-10-13）。下方 2026-09-05 的旧 Run 记录**保留不删**，仅作历史追溯。
+
+## Run 目标
+
+第三阶段「产品审查」——在真机上验收 mobile 原生 App 的**全 P0 主链**，产出可追溯的验收报告与缺陷清单。范围＝A1（mobile 真机全 P0 主链）；**只记录不修（B1）**；产物落盘（C1）。明确不验：Web 端跨端全量、代码风格审查、发布渠道合规。
+
+## Worker 完成情况
+
+| Worker | 职责 | 状态 | 产物 |
+|---|---|---|---|
+| Worker-1（清单执行） | 逐条执行 72 项判据并采集真机证据 | ✅ 完成 | `docs/acceptance-l3/evidence/`（68 张截图）、72 项状态列回填 |
+| Worker-2（结果整理） | 分组结果、专节、结论与建议 | ✅ 完成 | `docs/acceptance-l3/L3-REPORT.md` |
+| Worker-3（缺陷归档） | 缺陷分级、影响映射、修法方向 | ✅ 完成 | `docs/qa/BUGS_L3-产品问题清单.md` |
+
+三 Worker 均**未改动业务代码、未提交 Git、未操作其他设备**。
+
+## 设备与判据基准
+
+| 项 | 值 |
+|---|---|
+| 设备 | Redmi Note 12T Pro（model `23054RA19C`）／Android 15／arm64-v8a／单设备单账号 |
+| 验收对象 | `com.wanghoufan.placejournal` v0.1.0，versionCode 1，minSdk 24／targetSdk 36／compileSdk 36 |
+| 运行形态 | standalone（全程无 Metro，`adb reverse --list` 为空） |
+| 判据基准 | `docs/acceptance-l3/L3-CHECKLIST.md`（72 项）、`docs/pm/PRODUCT_PLAN_V1.5.md` |
+
+## 结论
+
+**72 项中 PASS 50（含 8 项附说明）／FAIL 6／BLOCKED 15／范围外 1。**
+
+判定：**P0 主链达成交付（有条件）**。1 个 P0（L3-19 选图后未保存即强杀丢照片与草稿，数据丢失级）+ 4 个 P1（L3-29 / L3-36 / D-1·L3-61 / D-2·L3-64）待修。15 项 BLOCKED 不得视为通过：F 组登录/OAuth 与跨端用例需**人工配合**（真实 Google 账号授权、退出登录、双账号）或**第二写入端**（Web 侧改数据、并发冲突构造），且 release 变体 `run-as` 不可用导致 4 项依赖私有 DB 的条目无法取证。
+
+## 产物路径
+
+- `docs/acceptance-l3/L3-REPORT.md`
+- `docs/acceptance-l3/L3-CHECKLIST.md`（状态列已回填）
+- `docs/qa/BUGS_L3-产品问题清单.md`
+- `docs/acceptance-l3/evidence/`（68 张截图）
+- `docs/handoff/HANDOFF.md §0.A.6`（本轮记录）
+
+## Next Action
+
+**进入第四阶段修复 P0 / P1。** 顺序：L3-19（媒体持久化时点）→ L3-61（同步无网络前置检查）→ L3-64（分享链路交付）→ L3-36 + L3-39（主题动态化与详情页系统栏）→ L3-29（画廊卡 `+N`）→ 解决 `run-as` 取证手段 → 按 `L3-REPORT.md §4` 组织人工配合回合补齐 15 项 BLOCKED。详细顺序与理由见 `L3-REPORT.md §6.3`。
+
+> ✅ 上述修复已在第四阶段执行完毕（5 项真机复验通过、L3-61 真机未验），见下方「第四阶段修复 Run」节；该节结论仍保留 L3 当时的原始判定，不回改历史。
+
+---
+
+# 第四阶段修复 Run（2026-10-13，因换机中断 → 同日恢复并完成复测回填）
+
+> 本节记录第四阶段的实际进展与中断点。**唯一权威交接文件**：`docs/handoff/接续恢复开发提示词丨2026-10-13 丨 L3 产品审查后.md`。
+
+## 已完成（代码就位）
+
+| 缺陷 | 状态 | 关键文件 |
+|---|---|---|
+| P0 · L3-19 选图后强杀丢图 | ✅ 已修 | `app/(tabs)/record.tsx`、`src/media/draftMedia.ts`、`src/features/draftStore.ts` |
+| P1 · L3-61 同步无网络前置 | ✅ 已修（**真机未验**） | `src/features/networkGate.ts`、`src/features/syncEntry.ts` |
+| P1 · L3-29 画廊卡 `+N` 角标 | ✅ 已修 | `app/(tabs)/index.tsx` |
+
+## 半成品已补完（原 Worker 被中断，中断后补完）
+
+| 缺陷 | 状态 | 风险 |
+|---|---|---|
+| P1 · L3-36 / L3-39 主题运行时重绘 + 详情页 StatusBar | ✅ 已补完并真机验证 | 10 个页面 + `ui.tsx` + `Lightbox.tsx` + `themeProvider.tsx` + `_layout.tsx` |
+| P1 · L3-64 分享链路交付 + OAuth 终态跳转 + PKCE S256 | ✅ 已补完并真机验证（分享链路）；OAuth/PKCE **真机未验** | 新增原生依赖（装机须重建 APK）；原 15 处 typecheck 报错已修绿 |
+
+## 真机复测结果（2026-10-13，Redmi Note 12 Pro / Android 14）
+
+- **复测包**：release 包，APK md5 `91ede313d0b60f955c527af6a45bf4ce`，装机 2026-10-13 22:03（设备锁定目标 Note 12 Pro）。
+- **已修复并真机验证通过（5 项）**：P0·L3-19（强杀恢复草稿、照片 2/9 真实渲染）、L3-29（单栏/双栏 `+1` 角标、单图无角标）、L3-36（未重启即时重绘）、L3-39（深色详情页顶部纯黑）、L3-64（系统分享面板真实弹出＋白名单快照页＋撤销/重分享链路）。
+- **代码已改、真机未验**：D-1·L3-61——该机**云端未配置**（无 `EXPO_PUBLIC_SUPABASE_*`），入口走 not_configured 分支，`no_network` 分支无法触发；同因云端未配置，**OAuth 三态与 PKCE S256、跨端同步/冲突/delete no-revival** 本轮未验。
+- **非真机证据**：APK 解包自检——`assets/index.android.bundle` 含 `openSystemShareSheet`、`place-journal-xi.vercel.app`、`分享公开链接`、`本机未配置云端同步`；`classes4.dex` 含 `ExpoClipboard`。
+- **复测新发现（未修）**：P3-7 已撤销快照页仍显示"未配置云端"提示（`docs/acceptance-l3/evidence/L4-29_after_revoke.png`）；O-4 `uiautomator dump` 对滚出视口节点报倒置 bounds（工具层，非 App 缺陷）。
+- **数据清理**：本轮造的 4 条分享快照已全部撤销、2 图测试记录已删除；用户原始 1 条记录保留。
+- **证据**：`docs/acceptance-l3/evidence/` 新增 `L4-` 前缀截图 12 张（合计 80 张）。
+
+## 工作区实测状态（2026-10-13 回填时）
+
+- `npx jest` → **56 套件 / 522 用例全绿**（中断时为 49 套件 / 449 用例）
+- `npx tsc --noEmit` → **0 报错**（中断时 15 处，全在 `src/supabase/pkce.ts`）
+- Git：**未提交任何内容**（用户未授权）
+- 结论：**工作区已可构建装机**（本轮装机即由此工作区产物）
+
+## 中断原因与设备变更
+
+用户将原目标机 Redmi Note 12T Pro 带离并指定新机 **Redmi Note 12 Pro**（Android 14），已按锁定纪律 pin 为目标机；adb 目标随后续任务切换，不自动改绑。第三阶段 L3 全量结论的设备口径仍为 12T Pro，本轮复测口径为 Note 12 Pro（见交接文件 §0.3 与 `L3-CHECKLIST.md §0.3`）。
+
+## Next Action
+
+1. 用户拍板交接文件 §6 六项（Find 分享入口 / 未发布弹不弹面板 / message 尾巴 / Web 未发布 vs 已撤销 / 是否 git commit / 云端未配置如何补验）
+2. 按 F 项拍板配置云端后补验 L3-61 `no_network`、OAuth 三态与 PKCE S256、跨端同步与冲突
+3. 处理 P3-7（撤销态文案）与 O-4（自动化 bounds 校验口径）
+4. 更新 `docs/handoff/HANDOFF.md §0` 后，由用户决定是否 git commit
+
+---
+
 # Coordination STATE 丨 双智能体复盘交叉验证 Run
 
 Updated: 2026-09-05T06:10Z (UTC) / PHASE 6 — CONVERGED
