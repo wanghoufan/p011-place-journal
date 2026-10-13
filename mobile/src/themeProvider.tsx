@@ -106,3 +106,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 export function useTheme(): ThemeContextValue {
   return useContext(ThemeContext)
 }
+
+/**
+ * 只订阅、不取色：`themedStyles` 造出来的是**模块级 Proxy**，它在读属性时才按当前调色板
+ * 取值，所以组件必须自己重渲染一次，颜色才会跟着明暗换。
+ * 依赖主题色的组件（`components/ui.tsx`、各页 `themedStyles`）调用一次即可，
+ * 不需要整页 key 强刷，也就不会丢导航栈与表单状态。
+ */
+export function useThemeSubscription(): void {
+  void useContext(ThemeContext)
+}

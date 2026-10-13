@@ -48,6 +48,10 @@ export function createNodeSqliteDatabase(location = ':memory:'): SqlDatabase {
       return toPlain<T>(row)
     },
 
+    close() {
+      db.close()
+    },
+
     withTransactionSync(task) {
       const nested = depth > 0
       const savepoint = `sp_${depth}`

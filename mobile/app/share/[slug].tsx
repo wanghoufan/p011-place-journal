@@ -1,5 +1,5 @@
-// ShareSingle：单条分享快照详情（本地段）。只读本机快照，渲染白名单字段；
-// 匿名公开页与真云发布留 T062，本页不发任何网络请求。
+// ShareSingle：单条分享快照详情。只读本机快照，渲染白名单字段；可调起系统分享面板
+// 分享公开链接（P1·L3-64），并就地显示该链接当前是否已发布；本页不发任何网络请求。
 
 import { useCallback, useState } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
@@ -10,13 +10,19 @@ import { getAppRepository } from '@/db/app'
 import { AppButton, Card, Chip, ConfirmDialog, EmptyState, ErrorState, LoadingState, SectionTitle, Stars } from '@/components/ui'
 import { formatDateTime, truncate } from '@/features/format'
 import { getShareSnapshotBySlug, type ShareSnapshotDetail } from '@/features/queries'
+import { openSystemShareSheet } from '@/features/shareActions'
+import { SHARE_PUBLICATION_HINT, sharePublicationState, type SharePublicationState } from '@/features/sharePublication'
 import { revokeShare } from '@/features/shares'
 import { colors } from '@/theme'
 import { themedStyles } from '@/theme'
+import { useThemeSubscription } from '@/themeProvider'
 
 export default function ShareSingleScreen() {
+  // 订阅明暗/配色：本页样式是 themedStyles 代理，不订阅就不会重渲染（返回上一页换主题再回来即露馅）。
+  useThemeSubscription()
   const { slug } = useLocalSearchParams<{ slug: string }>()
   const [detail, setDetail] = useState<ShareSnapshotDetail | null>(null)
+  const [publication, setPublication] = useState<SharePublicationState | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState('')
@@ -26,7 +32,10 @@ export default function ShareSingleScreen() {
   const load = useCallback(() => {
     try {
       const { db } = getAppRepository()
-      setDetail(getShareSnapshotBySlug(db, slug))
+      const next = getShareSnapshotBySlug(db, slug)
+      setDetail(next)
+      // 链接是否已发布（本地 outbox + 云端配置判定，零网络）：页面直接把状态说清楚。
+      setPublication(next ? sharePublicationState(db, next.snapshot.id) : null)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -63,6 +72,28 @@ export default function ShareSingleScreen() {
 
   const { snapshot, items } = detail
   const revoked = snapshot.status === 'revoked'
+  const publicationHint = publication ? SHARE_PUBLICATION_HINT[publication] : ''
+
+  // 分享（P1·L3-64）：与记录详情同一条链路（openSystemShareSheet），本页不另写实现。
+  const doShare = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const result = await openSystemShareSheet(snapshot)
+      if (result.outcome === 'failed') {
+        // 撤销态在面板弹出前被拦：只给明确提示，不弹打不开的链接。
+        setMessage(result.error || '无法打开系统分享。')
+      } else if (result.outcome === 'dismissed') {
+        setMessage('已取消分享。')
+      } else {
+        setMessage(publicationHint || '已打开系统分享，选择要分享的应用即可。')
+      }
+    } catch (err) {
+      setMessage(`分享失败：${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
@@ -82,13 +113,19 @@ export default function ShareSingleScreen() {
         {snapshot.ownerName ? <Text style={styles.muted}>分享人：{snapshot.ownerName}</Text> : null}
         <Text style={styles.slug}>slug：{snapshot.slug}</Text>
         <Text style={styles.hint}>
-          本页只读本机快照，展示匿名访客可见的白名单字段（地点名/区域/星级/预算/公开理由/标签/封面）。
-          公开页面与真云发布将在登录同步后生效。
+          本页只读本机快照，展示匿名访客可见的白名单字段（地点名/区域/星级/预算/公开理由/标签/封面）；
+          私密感受、转写与精确坐标不进快照，也不会进分享链接。点「分享公开链接」调起系统分享面板。
         </Text>
+        {publicationHint ? <Text style={styles.hint}>{publicationHint}</Text> : null}
         {message ? <Text style={styles.message}>{message}</Text> : null}
         {!revoked ? (
-          <AppButton label="撤销分享" variant="danger" onPress={() => setConfirmRevoke(true)} disabled={busy} />
-        ) : null}
+          <>
+            <AppButton label="分享公开链接" variant="secondary" onPress={() => void doShare()} disabled={busy} />
+            <AppButton label="撤销分享" variant="danger" onPress={() => setConfirmRevoke(true)} disabled={busy} />
+          </>
+        ) : (
+          <Text style={styles.muted}>已撤销：公开链接已失效，无法再分享；如需重新分享请到记录详情重新生成。</Text>
+        )}
       </Card>
 
       {items.map((item) => (

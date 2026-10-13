@@ -1,9 +1,11 @@
 // Record：完整记录表单（地点 + 日期 + 评分 + 预算 + 私密感受 + 公开理由 + 标签多选 + 媒体链）。
-// 全程本地：媒体先复制进持久目录，再与记录、outbox 一起落 SQLite；不接网络。
+// 全程本地：照片在「选中时」就复制进 App 私有持久目录（L3-19），表单与照片快照落既有
+// `meta` 表草稿键，进程被杀 / Activity 回收后重启可恢复；保存时才把暂存照片转成正式
+// media 行 + outbox，再与记录一起落 SQLite；全程不接网络。
 // 「交给 AI 整理 →」把当前表单存成内存草稿后进 ai-confirm（对标 Web Record → /confirm）；
 // 「不整理，直接保存记录」为不阻断的手工路径。
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import { router, useFocusEffect } from 'expo-router'
@@ -18,6 +20,7 @@ import {
 } from '@/media/picker'
 import { createExpoMediaFileSystem } from '@/media/localFiles'
 import { createExpoImageProcessor } from '@/media/processImage'
+import { discardDraftAssets, stageDraftAssets } from '@/media/draftMedia'
 import { persistPickedMedia } from '@/media/mediaService'
 import {
   AppButton,
@@ -31,16 +34,20 @@ import {
 } from '@/components/ui'
 import { Lightbox } from '@/components/Lightbox'
 import { consumeDraftSaved, setDraft } from '@/features/draft'
+import { clearPersistedDraft, loadPersistedDraft, savePersistedDraft } from '@/features/draftStore'
 import { aiNextGate, leafTags, toggleTagId, validateRecordForm } from '@/features/form'
 import { listPlaceOptions, listTagsGrouped, type PlaceOption, type TagGroup } from '@/features/queries'
 import { todayIso, parseOptionalBudget } from '@/features/format'
 import { createTagNamed, saveRecord } from '@/features/recordActions'
 import { colors } from '@/theme'
 import { themedStyles } from '@/theme'
+import { useThemeSubscription } from '@/themeProvider'
 
 const MAX_PHOTOS = 9
 
 export default function RecordScreen() {
+  // 订阅明暗/配色：本页样式是 themedStyles 代理，不订阅就不会重渲染（我的页切主题后回来即露馅）。
+  useThemeSubscription()
   const [places, setPlaces] = useState<PlaceOption[]>([])
   const [tagGroups, setTagGroups] = useState<TagGroup[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -71,6 +78,18 @@ export default function RecordScreen() {
     return pickerRef.current
   }, [])
 
+  // 草稿照片落盘用的依赖（文件系统 + 图片处理器）；保存时的正式落盘复用同一份。
+  const mediaDeps = useMemo(
+    () => ({ fs: createExpoMediaFileSystem(), images: createExpoImageProcessor() }),
+    [],
+  )
+
+  /** 当前已选照片的同步引用：异步回调里读最新值，避免闭包拿到旧数组。 */
+  const assetsRef = useRef<PickedAsset[]>([])
+  useEffect(() => {
+    assetsRef.current = assets
+  }, [assets])
+
   const load = useCallback(() => {
     try {
       const { db } = getAppRepository()
@@ -88,8 +107,56 @@ export default function RecordScreen() {
     }, [load]),
   )
 
+  // L3-19：恢复上次未保存的草稿（表单字段 + 已落盘照片）。每次会话只做一次，
+  // 且只在当前表单还是空白时恢复，避免覆盖用户正在填的内容或刚被 AI 整理页保存的表单。
+  const [hydrated, setHydrated] = useState(false)
+  useFocusEffect(
+    useCallback(() => {
+      if (hydrated) return
+      let cancelled = false
+      void (async () => {
+        try {
+          const { db } = getAppRepository()
+          const persisted = loadPersistedDraft(db)
+          if (!cancelled && persisted) {
+            // 文件已被系统清理掉的照片直接剔除：宁可少一张，也不留一张打不开的灰图。
+            const usable = persisted.assets.filter((asset) => mediaDeps.fs.exists(asset.uri))
+            if (assetsRef.current.length === 0) {
+              setPlaceId(persisted.placeId ?? null)
+              setNewMode(Boolean(persisted.newPlace))
+              setNewName(persisted.newPlace?.name ?? '')
+              setNewArea(persisted.newPlace?.area ?? '')
+              setVisitDate(persisted.visitDate)
+              setRating(persisted.rating)
+              setBudget(persisted.budget != null ? String(persisted.budget) : '')
+              setNotePrivate(persisted.notePrivate ?? '')
+              setNotePublic(persisted.notePublic ?? '')
+              setTagIds(persisted.tagIds)
+              setAssets(usable)
+              setMessage(
+                usable.length > 0
+                  ? `已恢复上次未保存的草稿，含 ${usable.length} 张照片。`
+                  : '已恢复上次未保存的草稿。',
+              )
+            }
+            if (usable.length !== persisted.assets.length) {
+              savePersistedDraft(db, { ...persisted, assets: usable })
+            }
+          }
+        } catch {
+          // 草稿读不出来不打扰用户，可重新填。
+        } finally {
+          if (!cancelled) setHydrated(true)
+        }
+      })()
+      return () => {
+        cancelled = true
+      }
+    }, [hydrated, mediaDeps]),
+  )
+
   // T045：Activity 被回收后恢复丢失的 picker 结果（只补媒体，不影响表单字段）。
-  // 每次会话只尝试一次，避免每次回到本页重复恢复同一批 pending 结果。
+  // 恢复到的同样是临时 URI，必须过一遍落盘暂存才能进草稿。
   const recoveredRef = useRef(false)
   useFocusEffect(
     useCallback(() => {
@@ -99,9 +166,11 @@ export default function RecordScreen() {
       void (async () => {
         try {
           const recovered = await getPicker().recoverPending()
-          if (!cancelled && recovered.length > 0) {
-            setAssets((prev) => [...prev, ...recovered].slice(0, MAX_PHOTOS))
-            setMessage(`已恢复 ${recovered.length} 张待保存照片。`)
+          if (cancelled || recovered.length === 0) return
+          const staged = await stageDraftAssets(mediaDeps, recovered)
+          if (!cancelled && staged.length > 0) {
+            setAssets((prev) => [...prev, ...staged].slice(0, MAX_PHOTOS))
+            setMessage(`已恢复 ${staged.length} 张待保存照片。`)
           }
         } catch {
           // 恢复失败不打扰用户，可手动重选。
@@ -110,7 +179,7 @@ export default function RecordScreen() {
       return () => {
         cancelled = true
       }
-    }, [getPicker]),
+    }, [getPicker, mediaDeps]),
   )
 
   const pick = useCallback(
@@ -124,43 +193,113 @@ export default function RecordScreen() {
           setMessage('已取消，未选择图片。')
           return
         }
-        setAssets((prev) => [...prev, ...picked].slice(0, MAX_PHOTOS))
-        setMessage(`已加入 ${picked.length} 张，保存时写入本机。`)
+        // 选中即落盘（L3-19）：草稿里只留 App 私有目录的持久路径，不留 content:// 临时 URI。
+        const staged = await stageDraftAssets(mediaDeps, picked)
+        const room = Math.max(0, MAX_PHOTOS - assetsRef.current.length)
+        const kept = staged.slice(0, room)
+        const dropped = staged.slice(kept.length)
+        if (dropped.length > 0) discardDraftAssets(mediaDeps, dropped)
+        setAssets((prev) => [...prev, ...kept].slice(0, MAX_PHOTOS))
+        setMessage(
+          dropped.length > 0
+            ? `已加入 ${kept.length} 张并复制到本机（最多 ${MAX_PHOTOS} 张，多余的已忽略）。`
+            : `已加入 ${staged.length} 张，已复制到本机；此时退出 App 也不会丢。`,
+        )
       } catch (error) {
         const detail = error instanceof MediaPickerError ? `${error.code}: ${error.message}` : String(error)
         setMessage(`图片选择失败：${detail}。可继续用文字记录。`)
       }
     },
-    [getPicker, saving],
+    [getPicker, mediaDeps, saving],
   )
 
-  const resetForm = useCallback(() => {
-    setPlaceId(null)
-    setPlaceQuery('')
-    setNewMode(false)
-    setNewName('')
-    setNewArea('')
-    setVisitDate(todayIso())
-    setRating(undefined)
-    setBudget('')
-    setNotePrivate('')
-    setNotePublic('')
-    setTagIds([])
-    setAssets([])
-    setPreviewIndex(null)
-    setSavedEntryId(null)
-  }, [])
+  /** 移除某张照片：连暂存副本一起删，避免残留文件占空间。 */
+  const removeAsset = useCallback(
+    (index: number) => {
+      const removed = assetsRef.current[index]
+      if (removed) discardDraftAssets(mediaDeps, [removed])
+      setAssets((prev) => prev.filter((_, i) => i !== index))
+    },
+    [mediaDeps],
+  )
+
+  /** 表单复位；`consumed` 为已转存/已放弃的照片，顺手清掉它们的草稿暂存副本与草稿快照。 */
+  const resetForm = useCallback(
+    (consumed?: PickedAsset[]) => {
+      try {
+        const { db } = getAppRepository()
+        discardDraftAssets(mediaDeps, consumed ?? assetsRef.current)
+        clearPersistedDraft(db)
+      } catch {
+        // 清草稿失败不影响已保存的记录：下次进本页若带出旧草稿，用户手动清空即可。
+      }
+      setPlaceId(null)
+      setPlaceQuery('')
+      setNewMode(false)
+      setNewName('')
+      setNewArea('')
+      setVisitDate(todayIso())
+      setRating(undefined)
+      setBudget('')
+      setNotePrivate('')
+      setNotePublic('')
+      setTagIds([])
+      setAssets([])
+      setPreviewIndex(null)
+      setSavedEntryId(null)
+    },
+    [mediaDeps],
+  )
 
   // AI 整理页保存成功后回到本页：清空表单一次，避免同一批内容被重复保存
   // （对标 Web Record 路由切换即卸载复位；本页在 tab 栈里常驻，只能靠保存信号显式复位）。
   useFocusEffect(
     useCallback(() => {
       if (consumeDraftSaved()) {
-        resetForm()
+        resetForm(assetsRef.current)
         setMessage('AI 整理页已保存这条记录。')
       }
     }, [resetForm]),
   )
+
+  // 草稿快照落本机 meta（L3-19）：恢复完成后每次变更都覆盖写，进程被杀也不丢已选照片与已填内容。
+  useEffect(() => {
+    if (!hydrated) return
+    const timer = setTimeout(() => {
+      try {
+        const { db } = getAppRepository()
+        const blank =
+          assets.length === 0 &&
+          !placeId &&
+          !newMode &&
+          !newName &&
+          !budget &&
+          !notePrivate &&
+          !notePublic &&
+          rating === undefined &&
+          tagIds.length === 0 &&
+          visitDate === todayIso()
+        if (blank) {
+          clearPersistedDraft(db)
+          return
+        }
+        savePersistedDraft(db, {
+          assets,
+          placeId: placeId ?? undefined,
+          newPlace: newMode ? { name: newName.trim(), area: newArea.trim() || undefined } : undefined,
+          visitDate,
+          rating,
+          budget: parseOptionalBudget(budget),
+          notePrivate: notePrivate.trim() || undefined,
+          notePublic: notePublic.trim() || undefined,
+          tagIds,
+        })
+      } catch {
+        // 写快照失败不打断录入，下次变更会再试。
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [assets, budget, hydrated, newArea, newMode, newName, notePrivate, notePublic, placeId, rating, tagIds, visitDate])
 
   // 设为封面：把点中的照片移到第一位（首图即封面，与 Web 一致）。
   const setCover = useCallback((index: number) => {
@@ -259,8 +398,9 @@ export default function RecordScreen() {
       let mediaWarning = ''
       if (assets.length > 0) {
         try {
+          // assets 的 uri 已是本机持久路径（选中时落盘），这里只做转存：生成正式 media 行 + outbox。
           await persistPickedMedia(
-            { fs: createExpoMediaFileSystem(), images: createExpoImageProcessor(), newId: newUuid },
+            { ...mediaDeps, newId: newUuid },
             repo,
             { assets, entryId: result.entryId, placeId: result.placeId, dependsOn: [result.entryOpId] },
           )
@@ -269,7 +409,7 @@ export default function RecordScreen() {
         }
       }
 
-      resetForm()
+      resetForm(assets)
       if (mediaWarning) {
         setSavedEntryId(result.entryId)
         setMessage(`${mediaWarning} 可在记录详情查看已保存内容。`)
@@ -281,7 +421,7 @@ export default function RecordScreen() {
     } finally {
       setSaving(false)
     }
-  }, [assets, budget, newArea, newMode, newName, notePrivate, notePublic, placeId, rating, resetForm, saving, tagIds, visitDate])
+  }, [assets, budget, mediaDeps, newArea, newMode, newName, notePrivate, notePublic, placeId, rating, resetForm, saving, tagIds, visitDate])
 
   if (loadError) return <ErrorState message={loadError} onRetry={load} />
 
@@ -332,7 +472,7 @@ export default function RecordScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="移除照片"
-                onPress={() => setAssets((prev) => prev.filter((_, i) => i !== index))}
+                onPress={() => removeAsset(index)}
                 style={styles.removeButton}
                 hitSlop={8}
               >

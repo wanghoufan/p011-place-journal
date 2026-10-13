@@ -21,6 +21,8 @@ export interface SqlDatabase {
   getAllSync<T>(source: string, ...params: SqlValue[]): T[]
   getFirstSync<T>(source: string, ...params: SqlValue[]): T | null
   withTransactionSync(task: () => void): void
+  /** 可选：关闭底层句柄。仅文件库测试适配器需要（用完即关，避免遗留句柄拖住 jest worker）。 */
+  close?(): void
 }
 
 /**

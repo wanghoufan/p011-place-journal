@@ -5,6 +5,8 @@
 //
 // 口径（基线 PRODUCT_PLAN_V1.5 + `features/account.ts`）：
 //   - 未配置云端 / 未登录：静默跳过，不算错误；
+//   - 无网络（可注入探针，默认由 App 注入 `isNetworkAvailable`）：跳过本轮并给明确原因，
+//     不发请求、不认领 outbox，UI 显示「无网络已跳过」而不是笼统失败；探针失灵一律放行；
 //   - owner 未绑定：不给「已开始同步」，走 `describeUnboundHint()` 阻断；
 //   - owner mismatch：只给阻断原因＋重登原账号（`describeOwnerMismatch`），不自动迁移、不跨号切号；
 //   - 门禁与实际发送同源：UI 用 `ownerGateForSync` 判定，push/pull 内部用 `assertOwnerForSync`
@@ -39,11 +41,16 @@ export interface SyncEntryDeps {
   isConfigured: boolean
   /** 引擎工厂：App 传 `createNativeSyncEngines`，单测注入 mock。 */
   createEngines: () => SyncEngines
+  /**
+   * 网络可用性探针（L3-61）。App 传 `isNetworkAvailable`（内部包 `expo-network`）；
+   * 单测注入固定返回，不依赖真实网络。不传＝不做网络前置，保持旧行为。
+   */
+  isNetworkAvailable?: () => Promise<boolean>
   outbox?: Outbox
   now?: () => number
 }
 
-export type SyncEntrySkipReason = 'not_configured' | 'signed_out' | 'in_flight'
+export type SyncEntrySkipReason = 'not_configured' | 'signed_out' | 'no_network' | 'in_flight'
 
 export type SyncEntryResult =
   | { status: 'ok'; owner: string; push: PushRunResult; pull: PullResult; media?: MediaPullResult }
@@ -54,6 +61,7 @@ export type SyncEntryResult =
 export const SYNC_NOT_CONFIGURED_MESSAGE = '云端未配置，未发起同步。'
 export const SYNC_SIGNED_OUT_MESSAGE = '未登录，未发起同步。'
 export const SYNC_IN_FLIGHT_MESSAGE = '同步进行中，本次未重复发起。'
+export const SYNC_NO_NETWORK_MESSAGE = '无网络连接，已跳过本轮同步。'
 
 /** 非 match 状态一律阻断，文案复用 account.ts 既有口径（不新增第二套说法）。 */
 function blockedResult(state: OwnerBindingState, boundOwner: string | null): SyncEntryResult {
@@ -80,6 +88,20 @@ export async function runSyncEntry(deps: SyncEntryDeps): Promise<SyncEntryResult
   const boundOwner = getBoundOwner(deps.db) ?? null
   const gate = ownerGateForSync(boundOwner, currentUserId)
   if (!gate.allowed) return blockedResult(gate.state, boundOwner)
+
+  // 网络前置（L3-61）：无网络就不发请求，避免错误刷屏与无谓的失败/停放计数。
+  // 探针抛错＝拿不到状态，放行同步（宁可多试一次，也不要卡死同步）。
+  if (deps.isNetworkAvailable) {
+    let online = true
+    try {
+      online = await deps.isNetworkAvailable()
+    } catch {
+      online = true
+    }
+    if (!online) {
+      return { status: 'skipped', reason: 'no_network', message: SYNC_NO_NETWORK_MESSAGE }
+    }
+  }
 
   // 同一时刻只跑一轮（Mine 的 focus 会重复触发）；残留锁可接管，不永久卡死。
   if (!acquireSyncLock(deps.db, now())) {

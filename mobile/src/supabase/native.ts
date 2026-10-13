@@ -15,6 +15,7 @@
 import 'react-native-url-polyfill/auto'
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import * as Crypto from 'expo-crypto'
 import * as Linking from 'expo-linking'
 import * as SecureStore from 'expo-secure-store'
 import * as WebBrowser from 'expo-web-browser'
@@ -32,6 +33,7 @@ import {
 import { AUTH_FINGERPRINT_STORAGE_KEY, AUTH_STORAGE_KEY } from './constants'
 import { createOAuthFingerprintRepo } from './fingerprint'
 import { buildAuthRedirectUri, resolveAuthRedirectUri } from './redirect'
+import { ensurePkceCrypto, type RandomBytes } from './pkce'
 import { createSecureJsonStore, createSecureStoreAdapter } from './secureStore'
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? ''
@@ -44,10 +46,33 @@ export function isSupabaseConfigured(): boolean {
 
 let cachedClient: SupabaseClient | null = null
 
+/**
+ * PKCE verifier 的密码学随机源（`expo-crypto` → 原生 `SecureRandom`）。
+ *
+ * RFC 7636 §4.1 要求 code_verifier 取自密码学安全随机源；auth-js 在
+ * `typeof crypto === 'undefined'`（Hermes 的真实状态）时退回 `Math.random()`，
+ * 熵源不合格。这里显式注入强随机源，让 auth-js 的 `getRandomValues` 走原生实现。
+ *
+ * 原生模块不可用时**直接抛错、不静默降级**——静默退回 `Math.random()` 会让 PKCE
+ * 在没人察觉的情况下失去意义。`expo-crypto` 未随 APK 构建（未重建）时会走到这里。
+ */
+const secureRandomBytes: RandomBytes = (byteLength) => {
+  try {
+    return Crypto.getRandomBytes(byteLength)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(`PKCE_RANDOM_SOURCE_UNAVAILABLE:${detail}`)
+  }
+}
+
 /** 创建（或复用）supabase 客户端；token 只经 SecureStore adapter 落盘。 */
 export function getSupabaseAuthClient(): SupabaseClient {
   if (!cachedClient) {
     if (!isSupabaseConfigured()) throw new Error('SUPABASE_ENV_MISSING')
+    // 建客户端前补齐 PKCE S256 所需全局（Hermes 无 crypto.subtle/TextEncoder 时
+    // auth-js 会静默退回 code_challenge_method=plain，authorize URL 里明文暴露 verifier）。
+    // 必须在 createClient 之前——auth-js 只在 signInWithOAuth 时读这些全局。
+    ensurePkceCrypto(secureRandomBytes)
     cachedClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
       auth: {
         storage: createSecureStoreAdapter(SecureStore),

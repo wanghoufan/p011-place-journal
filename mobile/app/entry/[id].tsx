@@ -44,10 +44,14 @@ import {
   updatePlace,
 } from '@/features/recordActions'
 import { createEntryShare } from '@/features/shares'
+import { openSystemShareSheet } from '@/features/shareActions'
 import { colors } from '@/theme'
 import { themedStyles } from '@/theme'
+import { useThemeSubscription } from '@/themeProvider'
 
 export default function EntryDetailScreen() {
+  // 订阅明暗/配色：本页样式是 themedStyles 代理，不订阅就不会重渲染（返回上一页换主题再回来即露馅）。
+  useThemeSubscription()
   const { id } = useLocalSearchParams<{ id: string }>()
   const [detail, setDetail] = useState<EntryDetail | null>(null)
   const [places, setPlaces] = useState<PlaceOption[]>([])
@@ -194,11 +198,19 @@ export default function EntryDetailScreen() {
     [detail, load],
   )
 
-  const doShare = useCallback(() => {
+  // 分享链路（P1·L3-64）：生成快照 → 先弹系统 Share Sheet（message＝白名单标题＋公开
+  // URL）→ 仍进快照页（保留原有查看/撤销入口）。链接是否已发布由快照页提示。
+  const doShare = useCallback(async () => {
     if (!detail) return
     try {
       const { db, repo } = getAppRepository()
       const snapshot = createEntryShare(db, repo, { entryId: detail.entry.id })
+      const result = await openSystemShareSheet(snapshot)
+      if (result.outcome === 'failed') {
+        // 撤销态/非法 slug 走这里：不弹打不开的链接，只给明确提示。
+        setMessage(result.error || '无法打开系统分享。')
+        return
+      }
       router.push(`/share/${snapshot.slug}`)
     } catch (err) {
       setMessage(err instanceof Error ? err.message : String(err))

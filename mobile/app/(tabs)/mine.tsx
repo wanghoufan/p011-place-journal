@@ -20,6 +20,7 @@ import {
   describeUnboundHint,
 } from '@/features/account'
 import { describeSyncEntry, runSyncEntry } from '@/features/syncEntry'
+import { isNetworkAvailable } from '@/features/networkGate'
 import { createNativeSyncEngines } from '@/sync/nativeSync'
 import { getSyncSummary, type SyncSummary } from '@/features/status'
 import { localCounts, shareSnapshotCount } from '@/features/queries'
@@ -108,6 +109,7 @@ export default function MineScreen() {
         db,
         loginState: state,
         isConfigured: isSupabaseConfigured(),
+        isNetworkAvailable,
         createEngines: createNativeSyncEngines,
       })
       // 阻断文案已在账号卡片就地显示同一句（account.ts），不重复贴一行。

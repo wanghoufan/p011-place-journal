@@ -6,10 +6,11 @@
 import TestRenderer from 'react-test-renderer'
 import type { ReactTestRendererJSON } from 'react-test-renderer'
 import type { ComponentProps } from 'react'
-import { StyleSheet, TextInput } from 'react-native'
+import { StyleSheet, TextInput, View } from 'react-native'
 
-import { AppButton, InlineTagCreator, MULTILINE_LINE_HEIGHT, TextField, multilineLinesFor } from '../ui'
-import { colors } from '../../theme'
+import { AppButton, Chip, InlineTagCreator, MULTILINE_LINE_HEIGHT, SyncBadge, TextField, multilineLinesFor } from '../ui'
+import { ThemeProvider, useTheme } from '../../themeProvider'
+import { colors, DARK_PALETTE, PALETTES, setActivePalette, themedStyles } from '../../theme'
 
 type Node = ReactTestRendererJSON
 
@@ -205,5 +206,162 @@ describe('TextField 多行高度', () => {
     const fallback = renderField({ multiline: true })
     expect(fallback.input.props.numberOfLines).toBe(3)
     TestRenderer.act(() => fallback.renderer.unmount())
+  })
+})
+
+// L3-36 回归：Chip / SyncBadge 的样式是模块级 themedStyles 代理，取色发生在渲染时。
+// 若组件自己不订阅主题，明暗切换后它不会重渲染，chip 会一直停在旧配色（真机表现：黑底浅字，
+// 强杀重启才恢复）。这里的 Chip 刻意挂在一个**非主题消费者**的父层下，
+// 切换只来自 ThemeProvider 的 context 变化，所以能证明订阅本身生效（而非被父级重渲染顺带刷新）。
+describe('主题切换：themed 基元随明暗换装', () => {
+  function roleNode(renderer: TestRenderer.ReactTestRenderer, role: string) {
+    const root = tree(renderer)
+    const node = [root, ...descendants(root)].find((n) => n.props.accessibilityRole === role)
+    if (!node) throw new Error(`未找到 ${role} 节点`)
+    return node
+  }
+
+  function chipStyleOf(renderer: TestRenderer.ReactTestRenderer) {
+    return StyleSheet.flatten(roleNode(renderer, 'button').props.style) as Record<string, unknown>
+  }
+
+  function renderThemed() {
+    let renderer: TestRenderer.ReactTestRenderer | null = null
+    let api: { setAppearance: (a: 'light' | 'dark') => void } | null = null
+    function Trigger() {
+      const { setAppearance } = useTheme()
+      api = { setAppearance }
+      return null
+    }
+    TestRenderer.act(() => {
+      renderer = TestRenderer.create(
+        <ThemeProvider>
+          <View>
+            <Chip label="露台" />
+            <SyncBadge status={null} />
+          </View>
+          <Trigger />
+        </ThemeProvider>,
+      )
+    })
+    return {
+      renderer: renderer as unknown as TestRenderer.ReactTestRenderer,
+      setAppearance: (a: 'light' | 'dark') => TestRenderer.act(() => api!.setAppearance(a)),
+    }
+  }
+
+  it('Chip 底色随明暗切换而变（不重启进程、不靠父级重渲染）', () => {
+    const { renderer, setAppearance } = renderThemed()
+    const light = chipStyleOf(renderer)
+
+    setAppearance('dark')
+    const dark = chipStyleOf(renderer)
+    expect(dark.backgroundColor).toBe(DARK_PALETTE.card)
+    expect(light.backgroundColor).not.toBe(dark.backgroundColor)
+
+    setAppearance('light')
+    expect(chipStyleOf(renderer).backgroundColor).toBe(light.backgroundColor)
+    TestRenderer.act(() => renderer.unmount())
+    setActivePalette(PALETTES.warm)
+  })
+
+  it('SyncBadge 底色/文字同样跟随明暗', () => {
+    const { renderer, setAppearance } = renderThemed()
+    // 徽章是 alignSelf:'flex-start' 的小胶囊（styles.badge 独有），用它定位，不靠顺序。
+    const badgeStyle = () => {
+      const node = descendants(tree(renderer)).find(
+        (n) => n.type === 'View' && StyleSheet.flatten(n.props.style)?.alignSelf === 'flex-start',
+      )
+      if (!node) throw new Error('未找到徽章节点')
+      return StyleSheet.flatten(node.props.style) as Record<string, unknown>
+    }
+    const light = badgeStyle()
+    expect(light.backgroundColor).toBe(PALETTES.warm.cardDeep)
+
+    setAppearance('dark')
+    const dark = badgeStyle()
+    expect(dark.backgroundColor).toBe(DARK_PALETTE.cardDeep)
+
+    setAppearance('light')
+    expect(badgeStyle().backgroundColor).toBe(light.backgroundColor)
+    TestRenderer.act(() => renderer.unmount())
+    setActivePalette(PALETTES.warm)
+  })
+
+  // 真机症状是「黑底浅字」——底色换了文字色没换同样算坏，所以文字色必须单独断言。
+  it('Chip 文字色随明暗切换而变（黑底浅字不再复现）', () => {
+    const { renderer, setAppearance } = renderThemed()
+    const chipTextColor = () => {
+      const button = roleNode(renderer, 'button')
+      const text = descendants(button).find((n) => n.type === 'Text')
+      if (!text) throw new Error('未找到 chip 文字节点')
+      return (StyleSheet.flatten(text.props.style) as Record<string, unknown>).color
+    }
+    const light = chipTextColor()
+    expect(light).toBe(PALETTES.warm.inkMuted)
+
+    setAppearance('dark')
+    const dark = chipTextColor()
+    expect(dark).toBe(DARK_PALETTE.inkMuted)
+    expect(dark).not.toBe(light)
+
+    setAppearance('light')
+    expect(chipTextColor()).toBe(light)
+    TestRenderer.act(() => renderer.unmount())
+    setActivePalette(PALETTES.warm)
+  })
+
+  // 负面对照：证明「订阅」本身才是关键，而不是被父级重渲染顺带刷新的假象。
+  // 未订阅的组件在 context 变化后不重渲染，代理里的新配色就永远读不到 —— 这正是 L3-36 的成因。
+  // 一旦有人把 useThemeSubscription() 从 ui.tsx / 各页面删掉，上面的用例会立刻失败。
+  it('负面对照：不订阅主题的 themedStyles 组件确实不会跟着换（说明订阅是必需的）', () => {
+    const unthemedStyles = themedStyles(() => ({
+      pill: { backgroundColor: colors.card, borderColor: colors.line },
+    }))
+    function Unsubscribed() {
+      return <View style={unthemedStyles.pill} />
+    }
+    let api: { setAppearance: (a: 'light' | 'dark') => void } | null = null
+    function Trigger() {
+      const { setAppearance } = useTheme()
+      api = { setAppearance }
+      return null
+    }
+    let renderer: TestRenderer.ReactTestRenderer | null = null
+    TestRenderer.act(() => {
+      renderer = TestRenderer.create(
+        <ThemeProvider>
+          {/* 这层 View 不是主题消费者，只为了让 toJSON 是单根；它自己不会因换色而重渲染。 */}
+          <View>
+            <Unsubscribed />
+            <Trigger />
+          </View>
+        </ThemeProvider>,
+      )
+    })
+    const pill = () => {
+      if (!renderer) throw new Error('renderer 未创建')
+      const root = tree(renderer)
+      const node = [root, ...descendants(root)].find((n) => {
+        const flat = StyleSheet.flatten(n.props.style) as Record<string, unknown> | undefined
+        return flat && 'borderColor' in flat
+      })
+      if (!node) throw new Error('未找到未订阅组件的节点')
+      return StyleSheet.flatten(node.props.style) as Record<string, unknown>
+    }
+
+    expect(pill().backgroundColor).toBe(PALETTES.warm.card)
+    TestRenderer.act(() => api!.setAppearance('dark'))
+    // 没订阅 → 没重渲染 → 仍是浅色那一份（这条断言锁住「订阅是必需的」这个前提）。
+    expect(pill().backgroundColor).toBe(PALETTES.warm.card)
+
+    // 但只要真的渲染一次，代理立刻给新配色 —— 说明代理没坏，坏的只是订阅。
+    TestRenderer.act(() => api!.setAppearance('light'))
+    TestRenderer.act(() => (renderer as unknown as TestRenderer.ReactTestRenderer).unmount())
+    setActivePalette(PALETTES.warm)
+    expect(unthemedStyles.pill.backgroundColor).toBe(PALETTES.warm.card)
+    setActivePalette(DARK_PALETTE)
+    expect(unthemedStyles.pill.backgroundColor).toBe(DARK_PALETTE.card)
+    setActivePalette(PALETTES.warm)
   })
 })

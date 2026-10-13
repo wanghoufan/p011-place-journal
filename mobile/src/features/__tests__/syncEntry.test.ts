@@ -21,6 +21,7 @@ import {
   runSyncEntry,
   SYNC_IN_FLIGHT_MESSAGE,
   SYNC_NOT_CONFIGURED_MESSAGE,
+  SYNC_NO_NETWORK_MESSAGE,
   SYNC_SIGNED_OUT_MESSAGE,
   type SyncEngines,
 } from '../syncEntry'
@@ -145,6 +146,100 @@ describe('syncEntry: 前置跳过（不触网、不动数据）', () => {
     expect(countPlaces(db)).toBe(1)
     expect(outbox.get('A')).toMatchObject({ status: 'pending' })
     expect(getBoundOwner(db)).toBe(OWNER)
+  })
+})
+
+describe('syncEntry: 网络前置（L3-61，不依赖真实网络）', () => {
+  it('无网络：跳过且 reason=no_network，不创建引擎、不发送、不认领、不写 last_sync_result', async () => {
+    const { db, outbox } = setup(OWNER)
+    outbox.enqueue({ kind: 'upsert_place', entityId: 'p1' }, { opId: 'A' })
+    const transport = createMockTransport()
+    const source = createMockPullSource({ places: [remotePlace(1)] })
+    const factory = spyFactory(engines(transport, source))
+
+    const result = await runSyncEntry({
+      db,
+      outbox,
+      loginState: signedIn(OWNER, 'match'),
+      isConfigured: true,
+      isNetworkAvailable: async () => false,
+      createEngines: factory.create,
+    })
+
+    expect(result).toEqual({
+      status: 'skipped',
+      reason: 'no_network',
+      message: SYNC_NO_NETWORK_MESSAGE,
+    })
+    expect(describeSyncEntry(result)).toBe(SYNC_NO_NETWORK_MESSAGE)
+    expect(factory.calls()).toBe(0)
+    expect(transport.calls).toHaveLength(0)
+    expect(source.calls).toBe(0)
+    expect(outbox.get('A')).toMatchObject({ status: 'pending' })
+    expect(getLastSyncResult(db)).toBeUndefined()
+    expect(isSyncLocked(db)).toBe(false)
+  })
+
+  it('有网络：正常跑 push/pull 并落 last_sync_result', async () => {
+    const { db, outbox } = setup(OWNER)
+    outbox.enqueue({ kind: 'upsert_place', entityId: 'p1' }, { opId: 'A' })
+    const transport = createMockTransport()
+    const source = createMockPullSource({ places: [remotePlace(1)] })
+
+    const result = await runSyncEntry({
+      db,
+      outbox,
+      loginState: signedIn(OWNER, 'match'),
+      isConfigured: true,
+      isNetworkAvailable: async () => true,
+      createEngines: () => engines(transport, source),
+    })
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') throw new Error('unreachable')
+    expect(transport.calls.map((c) => c.opId)).toEqual(['A'])
+    expect(result.pull.applied).toBe(1)
+    expect(getLastSyncResult(db)).toMatchObject({ done: 1, failed: 0, parked: 0 })
+    expect(isSyncLocked(db)).toBe(false)
+  })
+
+  it('网络状态获取异常：放行同步（不因探针失灵卡死）', async () => {
+    const { db, outbox } = setup(OWNER)
+    outbox.enqueue({ kind: 'upsert_place', entityId: 'p1' }, { opId: 'A' })
+    const transport = createMockTransport()
+    const source = createMockPullSource({ places: [remotePlace(1)] })
+
+    const result = await runSyncEntry({
+      db,
+      outbox,
+      loginState: signedIn(OWNER, 'match'),
+      isConfigured: true,
+      isNetworkAvailable: async () => {
+        throw new Error('native module missing')
+      },
+      createEngines: () => engines(transport, source),
+    })
+
+    expect(result.status).toBe('ok')
+    expect(transport.calls).toHaveLength(1)
+    expect(isSyncLocked(db)).toBe(false)
+  })
+
+  it('未注入探针：保持旧行为（直接进同步）', async () => {
+    const { db, outbox } = setup(OWNER)
+    const transport = createMockTransport()
+    const source = createMockPullSource({ places: [remotePlace(1)] })
+
+    const result = await runSyncEntry({
+      db,
+      outbox,
+      loginState: signedIn(OWNER, 'match'),
+      isConfigured: true,
+      createEngines: () => engines(transport, source),
+    })
+
+    expect(result.status).toBe('ok')
+    expect(transport.calls).toHaveLength(0)
   })
 })
 

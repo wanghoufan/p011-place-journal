@@ -17,6 +17,7 @@ export type MetaKey =
   | 'app_theme'
   | 'app_appearance'
   | 'gallery_layout'
+  | 'record_draft'
 
 export interface SyncResult {
   at: string

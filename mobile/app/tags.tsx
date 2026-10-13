@@ -24,6 +24,7 @@ import { createDimension, createTag, deleteTag, renameTag } from '@/features/rec
 import { dimensionKindLabel } from '@/features/format'
 import { colors } from '@/theme'
 import { themedStyles } from '@/theme'
+import { useThemeSubscription } from '@/themeProvider'
 
 interface AddTarget {
   dimensionId: string
@@ -32,6 +33,8 @@ interface AddTarget {
 }
 
 export default function TagsScreen() {
+  // 订阅明暗/配色：本页样式是 themedStyles 代理，不订阅就不会重渲染（返回上一页换主题再回来即露馅）。
+  useThemeSubscription()
   const [groups, setGroups] = useState<TagGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

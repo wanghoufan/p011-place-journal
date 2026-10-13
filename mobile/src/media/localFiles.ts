@@ -17,6 +17,8 @@ import { Directory, File, Paths } from 'expo-file-system'
 
 export const MEDIA_ROOT = 'place-journal'
 export const MEDIA_SUBDIR = 'media'
+/** 未保存草稿的暂存层（`media/_draft/<mediaId>/`）：选图即落盘，不依赖临时 URI。 */
+export const DRAFT_MEDIA_DIR = '_draft'
 export const DISPLAY_FILENAME = 'source-or-display.jpg'
 export const THUMB_FILENAME = 'thumb.jpg'
 
@@ -44,6 +46,26 @@ export function mediaTargetPaths(documentDirUri: string, entryId: string, mediaI
     displayUri: joinUri(dirUri, DISPLAY_FILENAME),
     thumbUri: joinUri(dirUri, THUMB_FILENAME),
   }
+}
+
+/**
+ * 草稿暂存目录（保存前）：与正式媒体同根同文件名，只把 `entryId` 段换成 `_draft`。
+ * 选中即复制进来，进程被杀后靠这里的文件 + 草稿快照恢复，不再依赖 picker 的临时 URI。
+ */
+export function draftMediaTargetPaths(documentDirUri: string, mediaId: string): MediaTargetPaths {
+  if (!mediaId) throw new Error('draftMediaTargetPaths: mediaId 必填')
+  const dirUri = joinUri(documentDirUri, MEDIA_ROOT, MEDIA_SUBDIR, DRAFT_MEDIA_DIR, mediaId)
+  return {
+    dirUri,
+    displayUri: joinUri(dirUri, DISPLAY_FILENAME),
+    thumbUri: joinUri(dirUri, THUMB_FILENAME),
+  }
+}
+
+/** 该 URI 是否落在草稿暂存目录下（只删暂存副本，绝不误删正式媒体）。 */
+export function isDraftMediaUri(documentDirUri: string, uri: string): boolean {
+  const prefix = joinUri(documentDirUri, MEDIA_ROOT, MEDIA_SUBDIR, DRAFT_MEDIA_DIR) + '/'
+  return uri.startsWith(prefix)
 }
 
 export interface MediaFileSystem {

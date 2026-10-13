@@ -11,8 +11,11 @@ import { describeConflict, listOpenConflictRows } from '@/features/status'
 import { formatDateTime, truncate } from '@/features/format'
 import { colors } from '@/theme'
 import { themedStyles } from '@/theme'
+import { useThemeSubscription } from '@/themeProvider'
 
 export default function ConflictsScreen() {
+  // 订阅明暗/配色：本页样式是 themedStyles 代理，不订阅就不会重渲染（返回上一页换主题再回来即露馅）。
+  useThemeSubscription()
   const [rows, setRows] = useState<ConflictRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

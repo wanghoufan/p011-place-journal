@@ -6,6 +6,7 @@
 export * from './constants'
 export * from './sha256'
 export * from './redirect'
+export * from './pkce'
 export * from './secureStore'
 export * from './fingerprint'
 export * from './owner'

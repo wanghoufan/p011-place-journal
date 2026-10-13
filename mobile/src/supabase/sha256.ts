@@ -19,11 +19,13 @@ function rotr(x: number, n: number): number {
   return ((x >>> n) | (x << (32 - n))) >>> 0
 }
 
-/** UTF-8 编码；优先 TextEncoder，缺失时用与 TextEncoder 等价的纯 JS 回退（含代理对）。 */
-export function utf8Encode(input: string): Uint8Array {
-  const g = globalThis as { TextEncoder?: new () => { encode(s: string): Uint8Array } }
-  if (typeof g.TextEncoder === 'function') return new g.TextEncoder().encode(input)
-
+/**
+ * UTF-8 编码的**纯 JS 实现**（与 `TextEncoder` 逐字节等价，含代理对）。
+ *
+ * 刻意不读全局 `TextEncoder`：`pkce.ts` 会把本函数包装成全局 `TextEncoder` 补齐给
+ * Hermes，若这里再走「优先全局」的分支就会自调用死循环。
+ */
+export function utf8EncodePure(input: string): Uint8Array {
   const out: number[] = []
   for (let i = 0; i < input.length; i++) {
     let code = input.charCodeAt(i)
@@ -50,6 +52,13 @@ export function utf8Encode(input: string): Uint8Array {
     }
   }
   return new Uint8Array(out)
+}
+
+/** UTF-8 编码；优先 TextEncoder，缺失时用与 TextEncoder 等价的纯 JS 回退（含代理对）。 */
+export function utf8Encode(input: string): Uint8Array {
+  const g = globalThis as { TextEncoder?: new () => { encode(s: string): Uint8Array } }
+  if (typeof g.TextEncoder === 'function') return new g.TextEncoder().encode(input)
+  return utf8EncodePure(input)
 }
 
 /** SHA-256 摘要（32 字节）。 */

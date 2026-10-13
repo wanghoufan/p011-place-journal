@@ -29,10 +29,13 @@ import { AI_API_TIMEOUT_MS, runOrganise, type OrganiseSuggestion } from '@/featu
 import { createTagNamed, saveRecord } from '@/features/recordActions'
 import { colors } from '@/theme'
 import { themedStyles } from '@/theme'
+import { useThemeSubscription } from '@/themeProvider'
 
 type Phase = 'input' | 'organising' | 'review' | 'skipped'
 
 export default function AiConfirmScreen() {
+  // 订阅明暗/配色：本页样式是 themedStyles 代理，不订阅就不会重渲染（返回上一页换主题再回来即露馅）。
+  useThemeSubscription()
   // 进页那一刻读一次记录页草稿（惰性初始化，只跑一次）；读不到 = 独立输入模式。
   const [draft] = useState<RecordDraft | null>(takeDraft)
 

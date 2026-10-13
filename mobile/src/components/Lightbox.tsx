@@ -16,6 +16,7 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 
+import { useThemeSubscription } from '../themeProvider'
 import { colors } from '../theme'
 import { themedStyles } from '../theme'
 
@@ -39,6 +40,7 @@ export function Lightbox({
   /** 传入才显示「设为封面」按钮。 */
   onSetCover?: (index: number) => void
 }) {
+  useThemeSubscription()
   const width = Dimensions.get('window').width
   const scrollRef = useRef<ScrollView>(null)
   const total = images.length

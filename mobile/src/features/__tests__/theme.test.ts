@@ -14,7 +14,9 @@ import {
   parseAppearance,
   parseTheme,
   resolveScheme,
+  setActivePalette,
   THEME_META_KEY,
+  themedStyles,
 } from '../../theme'
 
 describe('theme: 三主题调色板', () => {
@@ -100,5 +102,61 @@ describe('theme: 解析与持久化键', () => {
 
   it('持久化键与 meta 表约定一致', () => {
     expect(THEME_META_KEY).toBe('app_theme')
+  })
+})
+
+// L3-36：主题色样式是模块级代理，只在「读属性时」按当前调色板取值，
+// 所以行为契约有两条——切色后必须取到新配色，同色下必须命中缓存（否则每次渲染都重建 StyleSheet）。
+describe('themedStyles: 明暗切换后取新配色 + memo 命中', () => {
+  const styles = themedStyles(() => ({
+    chip: { backgroundColor: colors.card, borderColor: colors.line },
+    chipText: { color: colors.inkMuted },
+  }))
+
+  afterEach(() => {
+    // 活调色板是模块级单例，测试间必须复位，免得污染 theme.test 其它用例。
+    setActivePalette(PALETTES.warm)
+  })
+
+  it('按当前调色板取值（浅色默认取 warm）', () => {
+    setActivePalette(PALETTES.warm)
+    expect(styles.chip).toEqual({
+      backgroundColor: PALETTES.warm.card,
+      borderColor: PALETTES.warm.line,
+    })
+    expect(styles.chipText.color).toBe(PALETTES.warm.inkMuted)
+  })
+
+  it('切到深色后返回新配色（不再返回浅色那一份）', () => {
+    setActivePalette(PALETTES.warm)
+    const light = styles.chip
+    setActivePalette(DARK_PALETTE)
+    const dark = styles.chip
+    expect(dark).toEqual({
+      backgroundColor: DARK_PALETTE.card,
+      borderColor: DARK_PALETTE.line,
+    })
+    expect(dark).not.toBe(light)
+    expect(styles.chipText.color).toBe(DARK_PALETTE.inkMuted)
+  })
+
+  it('同一调色板内重复读取命中缓存（返回同一对象，不重建）', () => {
+    setActivePalette(DARK_PALETTE)
+    expect(styles.chip).toBe(styles.chip)
+    const first = styles.chip
+    expect(styles.chip).toBe(first)
+    expect(styles.chipText).toBe(styles.chipText)
+  })
+
+  it('切配色也重算（A→B），切回原配色命中该配色自己的缓存', () => {
+    setActivePalette(PALETTES.warm)
+    const warm1 = styles.chip
+    setActivePalette(PALETTES.sage)
+    const sage = styles.chip
+    expect(sage.backgroundColor).toBe(PALETTES.sage.card)
+    expect(sage).not.toBe(warm1)
+    setActivePalette(PALETTES.warm)
+    // 回到 warm：调色板对象是稳定引用，缓存按引用判定 → 同一色再取回同一份。
+    expect(styles.chip.backgroundColor).toBe(warm1.backgroundColor)
   })
 })

@@ -335,6 +335,14 @@ function sceneEmoji(name: string): string {
   )[name] ?? '🌿'
 }
 
+/**
+ * 多图角标数字（§3.3「画廊卡显示封面，其他照片以 `+N` 提示」）。
+ * = 照片总数 - 1（封面之外还有几张）；不足 2 张不出角标。
+ */
+export function extraPhotoCount(mediaCount: number): number {
+  return Math.max(0, Math.floor(mediaCount ?? 0) - 1)
+}
+
 /** 卡片 ↔ 清单行共用：取前 N 个标签名（回调稳定，故用 id 现场换名）。 */
 function tagNamesOf(tagIds: string[], tagNameOf: (id: string) => string, max: number): string[] {
   return tagIds.map(tagNameOf).filter(Boolean).slice(0, max)
@@ -386,6 +394,7 @@ export const EntryCard = memo(function EntryCard({
   const { palette } = useTheme()
   const styles = useMemo(() => makeStyles(palette), [palette])
   const visibleTags = tagNamesOf(entry.tagIds, tagNameOf, 2)
+  const extra = extraPhotoCount(entry.mediaCount)
   return (
     <Pressable
       accessibilityRole="button"
@@ -397,9 +406,9 @@ export const EntryCard = memo(function EntryCard({
         <View style={styles.timeChip}>
           <Text style={styles.timeChipText}>{relativeDayChip(entry.visitDate)}</Text>
         </View>
-        {entry.mediaCount > 1 ? (
+        {extra > 0 ? (
           <View style={styles.countChip}>
-            <Text style={styles.countChipText}>+{entry.mediaCount - 1}</Text>
+            <Text style={styles.countChipText}>+{extra}</Text>
           </View>
         ) : null}
       </View>
@@ -430,7 +439,7 @@ export const EntryCard = memo(function EntryCard({
   )
 })
 
-/** 记录行（单栏清单，样式对齐 Find 的清单行）：缩略图 + 地点 + 区域/时间 + 评分 + 标签。 */
+/** 记录行（单栏清单，样式对齐 Find 的清单行）：缩略图（含多图角标）+ 地点 + 区域/时间/张数 + 评分 + 标签。 */
 export const EntryRow = memo(function EntryRow({
   entry,
   tagNameOf,
@@ -443,13 +452,22 @@ export const EntryRow = memo(function EntryRow({
   const { palette } = useTheme()
   const styles = useMemo(() => makeStyles(palette), [palette])
   const visibleTags = tagNamesOf(entry.tagIds, tagNameOf, 3)
+  const extra = extraPhotoCount(entry.mediaCount)
   return (
     <Pressable
       accessibilityRole="button"
       style={({ pressed }) => [styles.rowCard, pressed && styles.cardPressed]}
       onPress={() => onPress(entry.id)}
     >
-      <Thumb uri={entry.coverThumbPath ?? ''} recyclingKey={`row-${entry.id}`} style={styles.rowThumb} />
+      {/* 缩略图包一层 relative：角标与双栏网格卡共用同一套样式，双/单栏观感一致。 */}
+      <View style={styles.rowThumbWrap}>
+        <Thumb uri={entry.coverThumbPath ?? ''} recyclingKey={`row-${entry.id}`} style={styles.rowThumb} />
+        {extra > 0 ? (
+          <View style={styles.countChip}>
+            <Text style={styles.countChipText}>+{extra}</Text>
+          </View>
+        ) : null}
+      </View>
       <View style={styles.rowBody}>
         <Text style={styles.placeName} numberOfLines={1}>
           {entry.placeName}
@@ -646,6 +664,8 @@ function buildStyles(c: Palette) {
       paddingVertical: 2,
     },
     timeChipText: { fontSize: 11, color: c.ink },
+    // 多图角标：压在照片上，故用中性半透明压深（不是主题色，浅/深色下读数一致）；
+    // 底色与文字色取自 palette，随主题走。双栏卡与单栏行共用这一套样式。
     countChip: {
       position: 'absolute',
       bottom: 8,
@@ -668,6 +688,7 @@ function buildStyles(c: Palette) {
       borderColor: c.line,
       padding: 12,
     },
+    rowThumbWrap: { position: 'relative', borderRadius: 10, overflow: 'hidden' },
     rowThumb: { width: 72, height: 72, borderRadius: 10, backgroundColor: c.cardDeep },
     rowBody: { flex: 1, gap: 3 },
     rowMeta: { fontSize: 12, color: c.inkMuted, flexShrink: 1 },

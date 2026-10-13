@@ -13,15 +13,18 @@ import {
   type KeyboardTypeOptions,
 } from 'react-native'
 
+import { useThemeSubscription } from '../themeProvider'
 import { colors, TOUCH_HEIGHT } from '../theme'
 import { themedStyles } from '../theme'
 import { syncLabel, syncTone, type SyncStatusLike } from '../features/format'
 
 export function Card({ children, style }: { children: ReactNode; style?: object }) {
+  useThemeSubscription()
   return <View style={[styles.card, style]}>{children}</View>
 }
 
 export function SectionTitle({ children, right }: { children: ReactNode; right?: ReactNode }) {
+  useThemeSubscription()
   return (
     <View style={styles.sectionTitle}>
       <Text style={styles.sectionTitleText}>{children}</Text>
@@ -47,6 +50,7 @@ export function AppButton({
   loading?: boolean
   style?: object
 }) {
+  useThemeSubscription()
   const blocked = disabled || loading
   return (
     <Pressable
@@ -111,6 +115,7 @@ export function Chip({
   disabled?: boolean
   dangerTone?: boolean
 }) {
+  useThemeSubscription()
   return (
     <Pressable
       accessibilityRole="button"
@@ -135,6 +140,7 @@ export function Stars({
   onChange?: (value: number | undefined) => void
   size?: number
 }) {
+  useThemeSubscription()
   const current = value ?? 0
   return (
     <View style={styles.starsRow} accessibilityLabel={`评分 ${current || '未评分'}`}>
@@ -194,6 +200,7 @@ export function TextField({
   /** 多行时的可见行数（Android 原生生效；不传则按 minHeight 推算，统一夹在 2–3 行）。 */
   numberOfLines?: number
 }) {
+  useThemeSubscription()
   const multilineHeight = minHeight ?? MULTILINE_MAX_LINES * MULTILINE_LINE_HEIGHT
   return (
     <View style={styles.fieldGroup}>
@@ -229,6 +236,7 @@ export function InlineTagCreator({
   busy?: boolean
   onCreate: (name: string) => void
 }) {
+  useThemeSubscription()
   const [name, setName] = useState('')
   const trimmed = name.trim()
   const submit = () => {
@@ -254,6 +262,7 @@ export function InlineTagCreator({
 }
 
 export function SyncBadge({ status }: { status: SyncStatusLike | null | undefined }) {
+  useThemeSubscription()
   const tone = syncTone(status)
   const toneStyle = tone === 'ok' ? styles.badgeOk : tone === 'warn' ? styles.badgeWarn : styles.badgeMuted
   const toneText = tone === 'ok' ? styles.badgeTextOk : tone === 'warn' ? styles.badgeTextWarn : styles.badgeTextMuted
@@ -277,6 +286,7 @@ export function EmptyState({
   actionLabel?: string
   onAction?: () => void
 }) {
+  useThemeSubscription()
   return (
     <View style={styles.centered}>
       <Text style={styles.emptyIcon}>{icon}</Text>
@@ -290,6 +300,7 @@ export function EmptyState({
 }
 
 export function LoadingState({ text = '加载中…' }: { text?: string }) {
+  useThemeSubscription()
   return (
     <View style={styles.centered}>
       <ActivityIndicator color={colors.terra} />
@@ -299,6 +310,7 @@ export function LoadingState({ text = '加载中…' }: { text?: string }) {
 }
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  useThemeSubscription()
   return (
     <View style={styles.centered}>
       <Text style={styles.errorTitle}>出错了</Text>
@@ -320,6 +332,7 @@ export function Sheet({
   onClose: () => void
   children: ReactNode
 }) {
+  useThemeSubscription()
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.sheetBackdrop}>
@@ -352,6 +365,7 @@ export function ConfirmDialog({
   onCancel: () => void
   onConfirm: () => void
 }) {
+  useThemeSubscription()
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.modalBackdrop}>

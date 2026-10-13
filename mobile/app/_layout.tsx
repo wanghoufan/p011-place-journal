@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { statusBarIconStyle, useAndroidWindowBackground } from '@/components/systemBars';
 import {
   attachAuthAutoRefresh,
   getAuthService,
@@ -54,11 +55,26 @@ function RootNavigator() {
     };
   }, []);
 
+  // L3-39：把 Android 窗口底色（edge-to-edge 下系统栏透明后露出来的那层）钉到当前纸色，
+  // 随明暗即时切换。理由与版本适配见 src/components/systemBars.ts 顶部注释。
+  useAndroidWindowBackground(palette);
+
   return (
     <>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      {/* expo-status-bar 57 已无 backgroundColor，这里只管图标明暗；底色由上面的窗口底色决定。 */}
+      <StatusBar style={statusBarIconStyle(scheme)} />
       <View style={{ flex: 1, backgroundColor: palette.paper }}>
-        <Stack screenOptions={{ contentStyle: { backgroundColor: palette.paper } }}>
+        <Stack
+          screenOptions={{
+            contentStyle: { backgroundColor: palette.paper },
+            // 原生页头默认取 AppCompat 的 DayNight，跟的是**系统**深浅，不是应用内主题；
+            // 深色模式进入详情页时它仍是白底，这里钉到当前纸色。
+            headerStyle: { backgroundColor: palette.paper },
+            headerTintColor: palette.ink,
+            headerTitleStyle: { color: palette.ink },
+            headerShadowVisible: false,
+          }}
+        >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="entry/[id]" options={{ title: '记录详情' }} />
           <Stack.Screen name="place/[id]" options={{ title: '地点' }} />

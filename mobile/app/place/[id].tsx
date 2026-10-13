@@ -22,8 +22,11 @@ import { getPlaceDetail, type PlaceDetail } from '@/features/queries'
 import { deletePlace, updatePlace } from '@/features/recordActions'
 import { colors } from '@/theme'
 import { themedStyles } from '@/theme'
+import { useThemeSubscription } from '@/themeProvider'
 
 export default function PlaceDetailScreen() {
+  // 订阅明暗/配色：本页样式是 themedStyles 代理，不订阅就不会重渲染（返回上一页换主题再回来即露馅）。
+  useThemeSubscription()
   const { id } = useLocalSearchParams<{ id: string }>()
   const [detail, setDetail] = useState<PlaceDetail | null>(null)
   const [loading, setLoading] = useState(true)
