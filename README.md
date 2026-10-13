@@ -55,7 +55,7 @@ npm install
 npm run android    # 连上手机或模拟器后启动
 ```
 
-自用安装包：`cd mobile/android && ./gradlew assembleRelease`，产物在 `mobile/android/app/build/outputs/apk/release/`。
+自用安装包：直接下载 [v0.1.0 通用 APK](https://github.com/wanghoufan/p011-place-journal/releases/tag/v0.1.0)（Android 7.0 及以上，单包含四种架构，不用挑机型；SHA-256 见 Release 说明）。想自己构建：`cd mobile/android && ./gradlew assembleRelease`，产物在 `mobile/android/app/build/outputs/apk/release/`。若手机上装过更早的调试签名包，需先卸载再装正式包，卸载会清掉尚未同步的本机记录。
 
 ## 配置
 

@@ -54,7 +54,7 @@ npm install
 npm run android    # with a device or emulator connected
 ```
 
-For your own install package: `cd mobile/android && ./gradlew assembleRelease`; the APK lands in `mobile/android/app/build/outputs/apk/release/`.
+For your own install package: download the [v0.1.0 universal APK](https://github.com/wanghoufan/p011-place-journal/releases/tag/v0.1.0) (Android 7.0+, one APK covering four ABIs so there is no device variant to pick; SHA-256 is listed in the release notes). To build it yourself: `cd mobile/android && ./gradlew assembleRelease`; the APK lands in `mobile/android/app/build/outputs/apk/release/`. If an older debug-signed build is installed, it must be uninstalled first — uninstalling clears records that were never synced.
 
 ## Configuration
 
