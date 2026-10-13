@@ -11,7 +11,18 @@
 
 ---
 
-## 0. 2026-10-02 收工快照（最新，先读这里）
+## 0.0 2026-10-13 洁癖＋README 收尾（现役，先看这一节）
+
+- **分支已归位**：`master` == `origin/master` == `wanghoufan/master` == 同一提交（09-22 那 25 个提交的落差已消失）。下方 §0 的「分支站错位」叙述是 10-02 历史，不再成立。
+- **README 中英双版重写**：补安卓端（`mobile/`）与双端同构说明；顶部改为四张真实界面图（画廊/记录/找地点/我的，本地 dev 真渲染、纯演示数据），旧 10-07 三张 `screen-0*.png` 已删。闸：`validate_readme.py --ui-product` → `DOCUMENTATION_READY`（0 warning）。
+- **GitHub About 已回读核验**：简介 82 字、homepage 仍为 Vercel（GitHub Pages 实测 404 不填）、topics 补 `expo` `react-native` 共 10 个。仓库当前**无 Release**，README 里不写下载链接。
+- **公开仓收口**：`.gitignore` 的 `*.旧版-2026-09-29` 泛化为 `*.旧版-*`，三份 09-13 迁移备份（AGENTS／USER_MODEL_OVERRIDE／docs/handoff/HANDOFF）移出索引、本地保留。
+- **temp/ 保留项**：`pre-switch-untracked/`（39M，恢复期快照，无独有文件）、`tabbar-zoom*.png`、`ui-*.xml` 等被 §0 与 HANDOFF 叙述引用，留到大阶段收尾再清。
+- **账本存量红灯未代改**：`TASK-MODEL-LOG#1`（`rework` 写成字符串）与 `DISPATCH-LOG#1`（`used=direct`）是历史行，按「不改写历史」保留；本轮新行已过 `check-ledger`。
+
+---
+
+## 0. 2026-10-02 收工快照（历史追溯）
 
 > 本节由 2026-10-02 一次「安卓端代码丢失 → 找回 → 出包 → 装真机」的操作生成。下方 §0.1/0.2/0.3 是 09-04 的历史快照，保留作追溯，**现役状态一律以本节为准**。
 
