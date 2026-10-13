@@ -155,16 +155,21 @@ describe('真 PushTransport：entry_tags 差量', () => {
     seedTag(db, 't1')
     db.runSync('INSERT INTO entry_tags (entry_id, tag_id) VALUES (?, ?)', 'e1', 't1')
     const gateway = createFakeGateway()
-    gateway.setRemote('entry_tags', [{ id: 'rt9', entry_id: 'e1', tag_id: 't9' }])
+    gateway.setRemote('entry_tags', [{ entry_id: 'e1', tag_id: 't9' }])
 
     const result = await transportFor(db, gateway).send({ opId: 'E', kind: 'upsert_entry', entityId: 'e1', dependsOn: [] })
 
     expect(result.outcome).toBe('ok')
+    const select = gateway.calls.find((c) => c.op === 'select' && c.table === 'entry_tags')
+    expect(select?.options?.columns).toBe('tag_id')
     const upsert = gateway.calls.find((c) => c.op === 'upsert' && c.table === 'entry_tags')
     expect(upsert?.onConflict).toBe('entry_id,tag_id')
     expect(upsert?.rows).toEqual([{ entry_id: 'e1', tag_id: 't1', owner_user_id: OWNER }])
     const remove = gateway.calls.find((c) => c.op === 'remove' && c.table === 'entry_tags')
-    expect(remove?.filters).toEqual([{ column: 'id', op: 'in', values: ['rt9'] }])
+    expect(remove?.filters).toEqual([
+      { column: 'entry_id', op: 'eq', value: 'e1' },
+      { column: 'tag_id', op: 'in', values: ['t9'] },
+    ])
   })
 })
 
@@ -297,5 +302,64 @@ describe('真 PushTransport：分享白名单', () => {
     expect(JSON.stringify(payload)).not.toContain('transcript')
     expect(payload).not.toHaveProperty('lat')
     expect(payload).not.toHaveProperty('lng')
+  })
+})
+
+describe('真 PushTransport：封面外键（entries_cover_owner_fk）', () => {
+  function setCover(db: SqlDatabase, entryId: string, mediaId: string): void {
+    db.runSync('UPDATE entries SET cover_media_id = ? WHERE id = ?', mediaId, entryId)
+  }
+
+  it('封面 media 未上云：entry 置空 cover_media_id 推送（本地封面不动）', async () => {
+    const db = setup()
+    seedPlace(db)
+    seedEntry(db, 'e1', 'p1', 1, null, 'local')
+    seedMedia(db, 'm1', 'e1', 'p1')
+    setCover(db, 'e1', 'm1')
+    const gateway = createFakeGateway({ insertRevision: 2 })
+
+    const result = await transportFor(db, gateway).send({ opId: 'E', kind: 'upsert_entry', entityId: 'e1', dependsOn: [] })
+
+    expect(result.outcome).toBe('ok')
+    expect(gateway.calls.find((c) => c.op === 'insert' && c.table === 'entries')?.row).toMatchObject({
+      cover_media_id: null,
+    })
+    expect(
+      db.getFirstSync<{ cover_media_id: string }>('SELECT cover_media_id FROM entries WHERE id = ?', 'e1')?.cover_media_id,
+    ).toBe('m1')
+  })
+
+  it('封面 media 已上云：entry 带 cover_media_id 推送', async () => {
+    const db = setup()
+    seedPlace(db)
+    seedEntry(db, 'e1', 'p1', 1, null, 'local')
+    seedMedia(db, 'm1', 'e1', 'p1')
+    setCover(db, 'e1', 'm1')
+    db.runSync("UPDATE media SET sync_status = 'synced', remote_path = ? WHERE id = 'm1'", `${OWNER}/p1/m1/display.jpg`)
+    const gateway = createFakeGateway({ insertRevision: 2 })
+
+    const result = await transportFor(db, gateway).send({ opId: 'E', kind: 'upsert_entry', entityId: 'e1', dependsOn: [] })
+
+    expect(result.outcome).toBe('ok')
+    expect(gateway.calls.find((c) => c.op === 'insert' && c.table === 'entries')?.row).toMatchObject({
+      cover_media_id: 'm1',
+    })
+  })
+
+  it('媒体上传成功后为引用它作封面的 entry 入队回填 upsert_entry', async () => {
+    const db = setup()
+    seedPlace(db)
+    seedEntry(db, 'e1', 'p1', 1, null, 'local')
+    seedMedia(db, 'm1', 'e1', 'p1')
+    setCover(db, 'e1', 'm1')
+    const gateway = createFakeGateway()
+
+    const result = await transportFor(db, gateway).send({ opId: 'M', kind: 'upload_media', entityId: 'm1', dependsOn: [] })
+
+    expect(result.outcome).toBe('ok')
+    const op = db.getFirstSync<{ kind: string; entity_id: string; status: string }>(
+      'SELECT kind, entity_id, status FROM outbox ORDER BY seq ASC',
+    )
+    expect(op).toMatchObject({ kind: 'upsert_entry', entity_id: 'e1', status: 'pending' })
   })
 })

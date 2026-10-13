@@ -227,3 +227,26 @@ describe('pull: 删除防复活', () => {
     expect(getPlace(db, 'p1')?.name).toBe('local')
   })
 })
+
+describe('pull: 标签父先于子（tags 自引用外键）', () => {
+  it('远端子标签排在父标签之前也不报 FK：按父链深度落盘', async () => {
+    const { db, outbox } = setup()
+    const source = createMockPullSource({
+      tag_dimensions: [
+        { id: 'd1', name: 'dim', kind: 'custom', sort_order: 0, revision: 1, updated_at: '2026-09-18T00:00:00.000Z' },
+      ],
+      tags: [
+        { id: 't-child', dimension_id: 'd1', parent_id: 't-parent', name: 'child', sort_order: 0, revision: 1, updated_at: '2026-09-18T00:00:00.000Z' },
+        { id: 't-parent', dimension_id: 'd1', parent_id: null, name: 'parent', sort_order: 0, revision: 1, updated_at: '2026-09-18T00:00:00.000Z' },
+      ],
+    })
+
+    const result = await createPullEngine({ db, source, outbox }).run({ currentUserId: OWNER })
+
+    expect(result.applied).toBe(3)
+    expect(db.getFirstSync<{ n: number }>('SELECT COUNT(*) AS n FROM tags')?.n).toBe(2)
+    expect(
+      db.getFirstSync<{ parent_id: string | null }>('SELECT parent_id FROM tags WHERE id = ?', 't-child')?.parent_id,
+    ).toBe('t-parent')
+  })
+})

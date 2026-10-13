@@ -3,8 +3,10 @@
 // 职责：
 //   1. owner 前置门禁：绑定账号与当前账号不一致（或未绑定）时整体阻断，不认领、不发送；
 //   2. 固定顺序：先 `releaseStaleClaims`（恢复进程被杀遗留的锁），再 `claim`；
-//   3. dependsOn DAG 解锁：父成功（本次完成或历史 alreadyDone）才放子；父未成功时子保持
-//      pending（释放回队列）且不计业务失败；缺父/成环抛 `PushDagError`；
+//   3. dependsOn DAG 解锁：父成功（本次完成、历史已删或 alreadyDone 声明）才放子；父未成功
+//      时子保持 pending（释放回队列）且不计业务失败；成环抛 `PushDagError`。
+//      父 op 已不在 outbox（成功即删）一律视为已完成——否则「父先成功、子跨轮遗留」
+//      会被当缺父把整批永久卡死（真机上待传清零不了就是这么来的）；
 //   4. 单 op 超时 + 整轮超时（push 默认 90s 量级，可配）；整轮超时把未处理的 claimed 归还；
 //   5. 失败累加 attempts/last_error，5 次转 parked 停放 24h（outbox 既有语义）。
 //
@@ -45,7 +47,7 @@ export class PushTimeoutError extends Error {
   }
 }
 
-/** DAG 完整性错误：缺父（依赖的 op 从未存在）或成环。 */
+/** DAG 完整性错误。`missing_parent` 保留枚举值供旧调用兼容，push 已不再抛它（缺父按已完成处理）。 */
 export class PushDagError extends Error {
   readonly reason: 'missing_parent' | 'cycle'
 
@@ -201,11 +203,14 @@ export function createPushEngine(deps: PushEngineDeps): PushEngine {
       const inBatch = new Set(claimed.map((r) => r.op_id))
 
       try {
-        // 3a) 缺父即报错（整批前置校验，先于任何发送）。
+        // 3a) 前置校验：outbox 仅在成功后删除，故「父 op 已不在 outbox」只可能是已完成
+        //     （或从未入队）。一律记入 completed 让子解锁——不再抛缺父，否则父先成功、
+        //     子跨轮遗留时整批被永久阻断（真机「待传 N 项」清不掉即此因）。真从未入队的
+        //     悬空依赖会在 transport 真发时失败、按 attempts 停放，不需要在此整批拦截。
         for (const row of claimed) {
           for (const dep of parseDependsOn(row)) {
             if (completed.has(dep) || inBatch.has(dep)) continue
-            if (!deps.outbox.get(dep)) throw new PushDagError('missing_parent', `${row.op_id} -> ${dep}`)
+            if (!deps.outbox.get(dep)) completed.add(dep)
           }
         }
         // 3b) 成环报错。

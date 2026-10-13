@@ -50,6 +50,8 @@ export interface MediaFileSystem {
   documentDirectoryUri(): string
   ensureDirectory(uri: string): void
   copy(sourceUri: string, destinationUri: string): void
+  /** 把字节写入目标文件（pull 媒体下载用）；目录需先 ensureDirectory。 */
+  writeBytes(uri: string, bytes: Uint8Array): void
   size(uri: string): number
   remove(uri: string): void
   exists(uri: string): boolean
@@ -67,6 +69,10 @@ export function createExpoMediaFileSystem(): MediaFileSystem {
 
     copy(sourceUri, destinationUri) {
       new File(sourceUri).copySync(new File(destinationUri), { overwrite: true })
+    },
+
+    writeBytes(uri, bytes) {
+      new File(uri).write(bytes)
     },
 
     size(uri) {

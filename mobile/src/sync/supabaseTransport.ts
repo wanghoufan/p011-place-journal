@@ -28,6 +28,7 @@ import {
 import { base64ToArrayBuffer } from './base64'
 import { addConflictRecord, type ConflictEntityKind } from './conflicts'
 import { eqFilter, inFilter, isUniqueViolation, type SyncGateway } from './gateway'
+import { createOutbox } from './outbox'
 import type { PushOpPayload, PushTransport, TransportResult } from './transport'
 
 type Row = Record<string, unknown>
@@ -179,6 +180,15 @@ export function createSupabaseTransport(deps: SupabaseTransportDeps): PushTransp
     db.runSync(`UPDATE ${table} SET sync_status = 'conflict' WHERE id = ?`, id)
   }
 
+  /** 封面 media 是否已上云：entries_cover_owner_fk 要求封面 media 先存在，未上云时先置空推送。 */
+  function isMediaCoverReady(mediaId: string): boolean {
+    const row = db.getFirstSync<{ sync_status: string; remote_path: string | null }>(
+      'SELECT sync_status, remote_path FROM media WHERE id = ?',
+      mediaId,
+    )
+    return !!row && (row.sync_status === 'synced' || toStringOrNull(row.remote_path) != null)
+  }
+
   async function fetchRemoteRow(table: string, id: string): Promise<Row | null> {
     const res = await gateway.select(table, { columns: '*', filters: [eqFilter('id', id)] })
     if (res.error) throw new Error(res.error.message)
@@ -205,6 +215,13 @@ export function createSupabaseTransport(deps: SupabaseTransportDeps): PushTransp
           : table === 'tag_dimensions'
             ? dimensionCloudRow(local, owner)
             : tagCloudRow(local, owner)
+
+    // entries_cover_owner_fk：封面 media 尚未上云时先按 null 推送 entry（本地封面不动、不丢数据），
+    // 待 upload_media 成功后再入队 upsert_entry 回填（见 uploadMedia）。否则整条记录被外键拦死。
+    if (table === 'entries') {
+      const coverId = toStringOrNull(local.cover_media_id)
+      if (coverId && !isMediaCoverReady(coverId)) cloudRow.cover_media_id = null
+    }
 
     const baseRaw = local.base_revision
     let expected: number | null = typeof baseRaw === 'number' ? baseRaw : null
@@ -249,15 +266,14 @@ export function createSupabaseTransport(deps: SupabaseTransportDeps): PushTransp
       .getAllSync<{ tag_id: string }>('SELECT tag_id FROM entry_tags WHERE entry_id = ?', entryId)
       .map((r) => r.tag_id)
     const remote = await gateway.select('entry_tags', {
-      columns: 'id, tag_id',
+      columns: 'tag_id',
       filters: [eqFilter('entry_id', entryId)],
     })
     throwIfError(remote.error, 'entry_tags select')
-    const remoteRows = remote.data ?? []
-    const remoteIds = new Set(remoteRows.map((r) => String(r.tag_id)))
+    const remoteIds = new Set((remote.data ?? []).map((r) => String(r.tag_id)))
     const desiredSet = new Set(desired)
     const toAdd = desired.filter((tagId) => !remoteIds.has(tagId))
-    const staleIds = remoteRows.filter((r) => !desiredSet.has(String(r.tag_id))).map((r) => String(r.id))
+    const toDel = [...remoteIds].filter((tagId) => !desiredSet.has(tagId))
 
     if (toAdd.length > 0) {
       const up = await gateway.upsert(
@@ -267,8 +283,9 @@ export function createSupabaseTransport(deps: SupabaseTransportDeps): PushTransp
       )
       throwIfError(up.error, 'entry_tags upsert')
     }
-    if (staleIds.length > 0) {
-      const del = await gateway.remove('entry_tags', [inFilter('id', staleIds)])
+    if (toDel.length > 0) {
+      // 云端 entry_tags 为复合主键（entry_id, tag_id）、无 id 列，按复合键删除。
+      const del = await gateway.remove('entry_tags', [eqFilter('entry_id', entryId), inFilter('tag_id', toDel)])
       throwIfError(del.error, 'entry_tags delete')
     }
   }
@@ -385,6 +402,13 @@ export function createSupabaseTransport(deps: SupabaseTransportDeps): PushTransp
       ts(),
       id,
     )
+
+    // 封面回填：引用此 media 作封面的 entry，此前若因 media 缺席被置空云端封面，这里重新入队恢复链接。
+    const coverEntries = db.getAllSync<{ id: string }>('SELECT id FROM entries WHERE cover_media_id = ?', id)
+    if (coverEntries.length > 0) {
+      const outbox = createOutbox(db)
+      for (const entry of coverEntries) outbox.enqueue({ kind: 'upsert_entry', entityId: String(entry.id) }, { now: ts() })
+    }
   }
 
   function shareSnapshotCloudRow(row: Row, ownerUserId: string): Row {
@@ -502,6 +526,12 @@ export function createSupabaseTransport(deps: SupabaseTransportDeps): PushTransp
           case 'upsert_entry': {
             if (!op.entityId) return { outcome: 'ok' }
             await pushCoreEntity('entries', op.entityId)
+            // entry_tags 的 tag 外键要求标签/维度先上云（对齐 Web ensureTagsInCloud）：
+            // 记录的标签若从未上云，直接 upsert entry_tags 会被 entry_tags_tag_fk 拦死。
+            const tagIds = db
+              .getAllSync<{ tag_id: string }>('SELECT tag_id FROM entry_tags WHERE entry_id = ?', op.entityId)
+              .map((r) => r.tag_id)
+            if (tagIds.length > 0) await pushTags({ opId: op.opId, kind: 'upsert_tags', entityIds: tagIds, dependsOn: [] })
             await syncEntryTags(op.entityId)
             return { outcome: 'ok' }
           }

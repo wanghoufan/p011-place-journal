@@ -227,6 +227,14 @@ export default function MineScreen() {
     }
   }, [demoBusy, load])
 
+  const handleRetryParked = useCallback(() => {
+    const { db } = getAppRepository()
+    db.runSync(
+      "UPDATE outbox SET status = 'pending', parked_at = NULL, claimed_at = NULL, attempts = 0 WHERE status = 'parked'",
+    )
+    void load()
+  }, [load])
+
   // 导出：读全量 → 纯序列化 → 写本机 cache + 拉起系统分享。
   const handleExport = useCallback(async (kind: 'json' | 'csv') => {
     if (exportBusy) return
@@ -331,6 +339,7 @@ export default function MineScreen() {
                 <Text style={styles.parkedError}>{op.lastError ?? '（无错误原文）'}</Text>
               </View>
             ))}
+            <AppButton label="重试停放项" variant="secondary" onPress={handleRetryParked} />
           </View>
         ) : (
           <Text style={styles.muted}>无停放项。</Text>

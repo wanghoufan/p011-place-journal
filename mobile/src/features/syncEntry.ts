@@ -17,6 +17,7 @@ import { createOutbox, type Outbox } from '../sync/outbox'
 import { OwnerBindingBlockedError, ownerGateForSync, type OwnerBindingState } from '../supabase/owner'
 import { createPullEngine, type PullResult, type PullSource } from '../sync/pull'
 import { createPushEngine, type PushRunResult } from '../sync/push'
+import type { MediaPullResult, MediaPuller } from '../sync/pullMedia'
 import type { PushTransport } from '../sync/transport'
 import type { SqlDatabase } from '../db/database'
 import { describeOwnerMismatch, describeUnboundHint } from './account'
@@ -26,6 +27,8 @@ export interface SyncEngines {
   owner: string
   transport: PushTransport
   source: PullSource
+  /** 云端媒体下行（可选；未提供则不拉照片）。 */
+  media?: MediaPuller
 }
 
 export interface SyncEntryDeps {
@@ -43,7 +46,7 @@ export interface SyncEntryDeps {
 export type SyncEntrySkipReason = 'not_configured' | 'signed_out' | 'in_flight'
 
 export type SyncEntryResult =
-  | { status: 'ok'; owner: string; push: PushRunResult; pull: PullResult }
+  | { status: 'ok'; owner: string; push: PushRunResult; pull: PullResult; media?: MediaPullResult }
   | { status: 'blocked'; reason: 'unbound' | 'mismatch'; message: string }
   | { status: 'skipped'; reason: SyncEntrySkipReason; message: string }
   | { status: 'error'; message: string }
@@ -93,6 +96,12 @@ export async function runSyncEntry(deps: SyncEntryDeps): Promise<SyncEntryResult
       currentUserId,
     })
 
+    // 云端照片下行：仅在核心表未被跳过（outbox 已清）时拉，避免与待推本地写入抢跑。
+    let media: MediaPullResult | undefined
+    if (!pull.skipped && engines.media) {
+      media = await engines.media.run()
+    }
+
     const at = new Date(now()).toISOString()
     setLastSyncResult(deps.db, {
       at,
@@ -101,7 +110,7 @@ export async function runSyncEntry(deps: SyncEntryDeps): Promise<SyncEntryResult
       parked: push.parked.length,
     })
     setLastSyncAt(deps.db, at)
-    return { status: 'ok', owner: engines.owner, push, pull }
+    return { status: 'ok', owner: engines.owner, push, pull, media }
   } catch (error) {
     // 门禁通过后 owner 才变（如并发换号）：push/pull 会抛同一门禁错误，按 account.ts 口径阻断。
     if (error instanceof OwnerBindingBlockedError) {
@@ -128,6 +137,7 @@ export function describeSyncEntry(result: SyncEntryResult): string {
       const parts = [`上传成功 ${result.push.done.length} 项`]
       if (result.push.failed.length > 0) parts.push(`失败 ${result.push.failed.length} 项`)
       if (result.push.parked.length > 0) parts.push(`停放 ${result.push.parked.length} 项`)
+      if (result.media && result.media.downloaded > 0) parts.push(`照片 ${result.media.downloaded} 张`)
       if (result.pull.skipped) parts.push('拉取已跳过（本地有待传写入）')
       else {
         if (result.pull.applied > 0) parts.push(`下行 ${result.pull.applied} 项`)

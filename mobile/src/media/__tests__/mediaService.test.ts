@@ -34,6 +34,9 @@ class FakeFileSystem implements MediaFileSystem {
   copy(sourceUri: string, destinationUri: string) {
     this.files.set(destinationUri, sourceUri.includes('thumb') ? 100 : 1000)
   }
+  writeBytes(uri: string, bytes: Uint8Array) {
+    this.files.set(uri, bytes.length)
+  }
   size(uri: string) {
     return this.files.get(uri) ?? 0
   }

@@ -24,6 +24,7 @@ export interface FakeGatewayCall {
     | 'upload'
     | 'removeObjects'
     | 'publicUrl'
+    | 'createSignedUrl'
   table?: string
   row?: Record<string, unknown>
   rows?: Record<string, unknown>[]
@@ -167,6 +168,11 @@ export function createFakeGateway(options: FakeGatewayOptions = {}): FakeGateway
     publicUrl(bucket, path) {
       calls.push({ op: 'publicUrl', bucket, path })
       return `${options.publicUrlBase ?? 'https://fake.local'}/${bucket}/${path}`
+    },
+
+    async createSignedUrl(bucket, path) {
+      calls.push({ op: 'createSignedUrl', bucket, path })
+      return ok({ signedUrl: `${options.publicUrlBase ?? 'https://fake.local'}/${bucket}/${path}?token=fake` })
     },
   }
 }

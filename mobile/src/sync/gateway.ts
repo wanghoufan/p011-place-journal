@@ -73,6 +73,8 @@ export interface SyncGateway {
   ): Promise<GatewayResult<{ path: string }>>
   removeObjects(bucket: string, paths: string[]): Promise<GatewayResult<unknown>>
   publicUrl(bucket: string, path: string): string | null
+  /** 私有桶下载用短期签名 URL（pull 媒体文件用）。 */
+  createSignedUrl(bucket: string, path: string, expiresInSeconds: number): Promise<GatewayResult<{ signedUrl: string }>>
 }
 
 export function eqFilter(column: string, value: string | number | boolean | null): GatewayFilter {

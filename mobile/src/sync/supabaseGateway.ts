@@ -115,5 +115,13 @@ export function createSupabaseGateway(client: SupabaseClient, schema: string = D
       const { data } = client.storage.from(bucket).getPublicUrl(path)
       return data?.publicUrl ?? null
     },
+
+    async createSignedUrl(bucket, path, expiresInSeconds) {
+      const { data, error } = await client.storage.from(bucket).createSignedUrl(path, expiresInSeconds)
+      return {
+        data: data ? { signedUrl: data.signedUrl } : null,
+        error: error ? { message: error.message } : null,
+      }
+    },
   }
 }

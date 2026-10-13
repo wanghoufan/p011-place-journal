@@ -93,16 +93,35 @@ describe('push: DAG 调度', () => {
     expect(outbox.get('A')?.last_error).toContain('display')
   })
 
-  it('缺父报错并归还 claimed', async () => {
+  it('缺父（父 op 已删=已成功）不算错：子自动解锁并推送', async () => {
     const { db, outbox } = setup()
     outbox.enqueue({ kind: 'upload_media', entityId: 'm1', dependsOn: ['GHOST'] }, { opId: 'B' })
     const transport = createMockTransport()
 
-    await expect(createPushEngine({ db, outbox, transport }).run({ currentUserId: OWNER })).rejects.toMatchObject({
-      reason: 'missing_parent',
+    const result = await createPushEngine({ db, outbox, transport }).run({ currentUserId: OWNER })
+
+    expect(result.done).toEqual(['B'])
+    expect(transport.calls.map((c) => c.opId)).toEqual(['B'])
+    expect(outbox.pendingCount()).toBe(0)
+  })
+
+  it('回归：父本轮成功后已删，遗留子跨轮不再卡死（真机「待传 N 项」清不掉的根因）', async () => {
+    const { db, outbox } = setup()
+    outbox.enqueue({ kind: 'upsert_entry', entityId: 'e1' }, { opId: 'PARENT' })
+    outbox.enqueue({ kind: 'upload_media', entityId: 'm1', dependsOn: ['PARENT'] }, { opId: 'CHILD' })
+    const transport = createMockTransport()
+
+    // 第 1 轮 batchLimit=1：只认领父；父成功即从 outbox 删除，子仍 pending（模拟轮超时/中断）。
+    const first = await createPushEngine({ db, outbox, transport, config: { batchLimit: 1 } }).run({
+      currentUserId: OWNER,
     })
-    expect(transport.calls).toHaveLength(0)
-    expect(outbox.get('B')?.status).toBe('pending')
+    expect(first.done).toEqual(['PARENT'])
+    expect(outbox.get('PARENT')).toBeNull()
+
+    // 第 2 轮只剩子，其父已删：不得抛缺父，子应正常推送、队列清零。
+    const second = await createPushEngine({ db, outbox, transport }).run({ currentUserId: OWNER })
+    expect(second.done).toEqual(['CHILD'])
+    expect(outbox.pendingCount()).toBe(0)
   })
 
   it('依赖成环报错并归还 claimed', async () => {

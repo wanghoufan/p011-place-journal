@@ -238,6 +238,7 @@ export default function FindScreen() {
     <View style={styles.flex}>
       {view === 'list' ? (
         <FlatList
+          key="find-list"
           data={hits}
           keyExtractor={(item) => item.placeId}
           contentContainerStyle={styles.container}
@@ -254,6 +255,7 @@ export default function FindScreen() {
         />
       ) : (
         <FlatList
+          key="find-gallery"
           data={hits}
           keyExtractor={(item) => item.placeId}
           numColumns={2}

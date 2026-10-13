@@ -156,8 +156,7 @@ const DELETE_OP_BY_KIND: Partial<Record<ConflictEntityKind, string>> = {
   tag: 'delete_tags',
 }
 
-/** 本地是否存在针对该实体的删除 op 标记（pending/claimed/parked 均算；防远端复活）。 */
-function hasDeleteMarker(db: SqlDatabase, kind: ConflictEntityKind, entityId: string): boolean {
+/** 本地是否存在针对该实体的删除 op 标记（pending/claimed/parked 均算；防远端复活）。 */function hasDeleteMarker(db: SqlDatabase, kind: ConflictEntityKind, entityId: string): boolean {
   const opKind = DELETE_OP_BY_KIND[kind]
   if (!opKind) return false
   const rows = db.getAllSync<{ entity_id: string | null; entity_ids: string | null }>(
@@ -176,6 +175,30 @@ function hasDeleteMarker(db: SqlDatabase, kind: ConflictEntityKind, entityId: st
     }
   }
   return false
+}
+
+/**
+ * tags 父先于子排序：本地 tags.parent_id 有自引用外键，远端按 id 序落盘时子可能先于父
+ * （tags_parent_fk 拦死整轮 pull）。按父链深度升序，父不在本批（已在本地）时提前停止。
+ */
+function orderTagsParentFirst(rows: RemoteEntityRow[]): RemoteEntityRow[] {
+  const byId = new Map(rows.map((row) => [String(row.id), row]))
+  const depthOf = (row: RemoteEntityRow): number => {
+    let depth = 0
+    let current: RemoteEntityRow | undefined = row
+    const seen = new Set<string>()
+    for (;;) {
+      const parentId = current?.parent_id
+      if (typeof parentId !== 'string' || parentId.length === 0 || seen.has(parentId)) break
+      seen.add(parentId)
+      const parent = byId.get(parentId)
+      if (!parent) break
+      depth += 1
+      current = parent
+    }
+    return depth
+  }
+  return [...rows].sort((a, b) => depthOf(a) - depthOf(b))
 }
 
 export function createPullEngine(deps: PullEngineDeps): PullEngine {
@@ -205,14 +228,22 @@ export function createPullEngine(deps: PullEngineDeps): PullEngine {
 
       // 4) 单事务合并（全成或全败，避免半拉状态）。
       deps.db.withTransactionSync(() => {
+        const applyRemote = (table: (typeof CORE_ENTITY_BINDINGS)[number]['table'], remote: RemoteEntityRow): void => {
+          try {
+            upsertLocalRow(deps.db, table, remoteRowToLocalRow(table, remote))
+          } catch (error) {
+            throw new Error(`pull merge ${table} id=${String(remote.id)}: ${error instanceof Error ? error.message : String(error)}`)
+          }
+        }
         for (const binding of CORE_ENTITY_BINDINGS) {
           const remoteRows = snapshot[binding.table]
           if (!remoteRows || remoteRows.length === 0) continue
+          const orderedRows = binding.table === 'tags' ? orderTagsParentFirst(remoteRows) : remoteRows
 
           const locals = deps.db.getAllSync<LocalRow>(`SELECT * FROM ${binding.table}`)
           const byId = new Map(locals.map((row) => [String(row.id), row]))
 
-          for (const remote of remoteRows) {
+          for (const remote of orderedRows) {
             const id = String(remote.id)
             const remoteRevision = typeof remote.revision === 'number' ? remote.revision : 0
 
@@ -225,7 +256,7 @@ export function createPullEngine(deps: PullEngineDeps): PullEngine {
             const local = byId.get(id)
             if (!local) {
               // 4b) 本地缺失 → 采纳远端。
-              upsertLocalRow(deps.db, binding.table, remoteRowToLocalRow(binding.table, remote))
+              applyRemote(binding.table, remote)
               result.applied += 1
               continue
             }
@@ -254,7 +285,7 @@ export function createPullEngine(deps: PullEngineDeps): PullEngine {
 
             // 4d) clean 且远端更新 → 覆盖并推进 base。
             if (remoteRevision > base) {
-              upsertLocalRow(deps.db, binding.table, remoteRowToLocalRow(binding.table, remote))
+              applyRemote(binding.table, remote)
               result.applied += 1
             }
           }
