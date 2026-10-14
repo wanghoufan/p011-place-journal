@@ -1,3 +1,65 @@
+# Coordination STATE 丨 最终快照（2026-10-14 收工）
+
+> **本节为最新状态，优先级高于下方所有小节。** 完整交接文件：`docs/handoff/HANDOFF.md §0.A.7`。
+
+## 收工状态
+
+| 项 | 值 |
+|---|---|
+| 代码基线 | `npx tsc --noEmit` 0 报错；`npx jest` **57 套件 / 529 用例全绿** |
+| 提交 | `abf9249`(docs) → `d3f347f`(P0+4P1) → `421ceb8`(登录态+失败口径)；⚠️ 与 `origin/master` **已分叉**（远端 4 个本地没有，含 `a856f32` 改用自建发布密钥签名 + 挂 v0.1.0 安装包；本地 3 个远端没有），合入需先 merge/rebase |
+| 现役 APK | md5 `22a5f309855e0c92ed718acbab875e99`（含云端配置，已登录） |
+| 目标机 | **Redmi Note 12T Pro** / Android 15，序列号 `UKCESWB67PUO7LPB`（用户主力机；已装最新包 md5 `22a5f309…`，10 项修复复验 8 项 PASS） |
+| 另一台 | Redmi Note 12 Pro / Android 14（未锁定）——31 个同步冲突与 `tags_dim_owner_fk` 外键失败的出处 |
+| 云端配置 | `mobile/.env.local`（gitignored）已写公开 URL + publishable key；重新出包前须先确认在 |
+
+## 修复与真机复验
+
+**10 项全部真机验证通过**：P0·L3-19 丢图、L3-29 `+N` 角标、L3-36 主题即时重绘、L3-39 详情页深色系统栏、L3-61 无网络前置、L3-64 分享链路、新 P1 登录后自动回主界面、新 P1 PKCE S256（间接）、新 P3 登录态语义、新 P3 失败记录口径。
+
+**2026-10-14 补验（Note 12T Pro，本轮）**：机器上的 base.apk md5 核对为 `22a5f309…`，全程 standalone（无 Metro、`adb reverse` 为空）。**8 项实测 PASS**：L3-19（选 2 张→强杀→重开提示「已恢复上次未保存的草稿，含 2 张照片。」2/9 渲染）、L3-29（单栏 `+2`/`+5`、单图无角标）、L3-36（深色→浅色不重启即时换装）、L3-39（深色详情页顶部纯黑+白图标）、L3-61（飞行模式→「无网络连接，已跳过本轮同步。」）、L3-64（Share Sheet 真弹出带公开链接；再分享=新快照 1→2 条；撤销后仅剩失效文案）、登录态（只显示「退出登录」、徽章「已同步」）、standalone 冷启动。
+**未验 2 项**：新 P1 auth/callback 回落、新 P1 PKCE S256 —— 均需退出登录后走 Google OAuth，会动用户登录态，须用户本人在场配合。
+测试产生的草稿照片与分享快照已全部回收，主题改回「跟随系统」。
+
+## `tags_dim_owner_fk` 根因：已定位（2026-10-14 收工前）
+
+**结论：第三种根因，既不是甲也不是乙——是 `pushCoreEntity` 把「0 行更新」静默吞成冲突。**
+
+证据（本机 SQLite 于 Note 12 Pro 拉取，云端经 supabase CLI 直查）：
+
+| | 维度 id |
+|---|---|
+| Note 12 Pro 本机（4 个） | `634d9c2a`人群 / `00750d71`地区 / `437bb1ef`场景 / `0a40f9ee`类型 |
+| 云端（5 个） | `cfd723b5`人群 / `5449118e`地区 / `4f7c7820`场景 / `804a2cbe`场景 / `167533be`类型 |
+
+**同名但 id 零重合**（云端那套由另一端生成）。断链：
+
+1. 本机 4 个维度 `base_revision=0`（非 null）→ `pushCoreEntity` 判 `expected=0` 认为「云端已有」→ **跳过 INSERT**，直接 `updateIfRevision`（`supabaseTransport.ts:223-226`）。
+2. 云端无此 id → 更新 0 行 → 记冲突 + 本地标 `conflict` + **`return` 不抛错**（`:253-262`）。本机 3 个维度正是 `conflict`，1 个还是 9 月前的 `synced`（云端被清后本地状态没回退）。
+3. 维度没上云 → 紧随的 `tags insert` 撞复合外键 `FOREIGN KEY (dimension_id, owner_user_id) → tag_dimensions(id, owner_user_id)` → `upsert_tags`(seq 13) 与 `upsert_entry`(seq 15) 各 attempts 3 失败。
+
+**修复方向（未实施，用户决定不修）**：`pushCoreEntity` 0 行更新时若远端确实无此行 → 回退 INSERT；仍失败才抛错。约 10 行，不动用户数据。第二层「同名不同 id 对齐」需要数据迁移，风险更高。
+
+**影响范围**：仅 Note 12 Pro。**主力机 Note 12T Pro 完全正常**——29 标签 / 9 记录 / 16 照片全已同步，0 冲突 0 失败，不受影响。31 个待裁决冲突维持「先放着」。
+
+## builder 派工（用户 2026-10-14 指令，现役，不得改母版真源）
+
+主用 **opencode go** + `opencode-go/deepseek-v4.1-flash`；备用 **codebuddy** + deepseek-v4.1-flash。
+实测 `opencode --model opencode-go/deepseek-v4.1-flash` 在本机报 `Unexpected server error`，先试备用 codebuddy。
+
+## 未提交改动
+
+`docs/handoff/HANDOFF.md` + `coordination/STATE.md` 的交接内容**尚未 commit**（等用户授权）。
+
+## Next Action
+
+1. 用户主力机是 Note 12T Pro，该机无待修问题；`tags_dim_owner_fk` 只影响 Note 12 Pro，用户决定**暂不修**（要用那台时再改 `pushCoreEntity` 0 行回落 INSERT）
+2. 补验 L3-43 重复回调重放、L3-46/47 双账号 owner mismatch、跨端拉取与并发冲突（需用户在场配合 OAuth）
+3. **磁盘告急**：Data 卷可用仅 ~1.7G（100% 满），debug 构建曾被 `No space left on device` 打挂；需用户授权跑 `/storage-analyzer` 出清理清单
+4. push 三笔代码提交 + 提交交接文档改动（均需用户二次确认）
+
+---
+
 # Coordination STATE 丨 L3 产品审查 Run（2026-10-13）
 
 > 本节为最新一轮记录（2026-10-13）。下方 2026-09-05 的旧 Run 记录**保留不删**，仅作历史追溯。

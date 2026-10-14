@@ -1,4 +1,4 @@
-# HANDOFF 丨 个人打卡小工具（地点手账 PWA + 安卓 App）丨 2026-10-02 收工（安卓端恢复装真机；分支站错位待归位；tab 图标待用户拍板）
+# HANDOFF 丨 个人打卡小工具（地点手账 PWA + 安卓 App）丨 2026-10-14 收工（L3 已过、第四阶段 10 项修复真机全绿并已在主力机 Note 12T Pro 补验 8 项；标签上传外键根因已定案、决定暂不修；3 笔提交未推送）
 
 > 用途：新智能体接续恢复开发的**唯一入口文档**。先读本文，再按「必读文档」顺序补齐上下文。
 > 项目路径：`/Users/zzymima0000/Developer/coding/1.Active/011-ing-个人打卡小工具`
@@ -118,10 +118,71 @@ APK 产物路径：`mobile/android/app/build/outputs/apk/release/app-release.apk
 - **取证手段受限**：release 变体 `run-as` 不可用，读不到私有 SQLite/持久目录，直接导致 L3-15/17/18/25 判 BLOCKED——**这 15 项 BLOCKED 不得视为通过**。
 - **下一步**：进入第四阶段修复，顺序建议 L3-19 → L3-61 → L3-64 → L3-36+L3-39 → L3-29 → 取证手段 → 补齐 BLOCKED（详见 `L3-REPORT.md §6.3`）。
 
+### 0.A.7 2026-10-13～14 轮：第四阶段「修复 + 真机复验」已收工（**3 个 commit 未推送**）
+
+> 用户口令「第三阶段，产品审查」→ 完成 L3 验收 →「b 1」进入第四阶段修复 → 换机到 **Redmi Note 12 Pro** 后继续 → 收工前切回 **Redmi Note 12T Pro** 并装上最新包。本轮改代码、装机、真机复验，共 3 笔提交在本地 `master-2` 分支。
+
+- **修复并真机全部验证通过（8 项）**：
+
+| 缺陷 | 修复要点 | 真机结论 |
+|---|---|---|
+| **P0·L3-19** 选图后强杀丢图 | 选中即复制到私有 `_draft/` 目录；草稿快照落既有 `meta` 表（`record_draft` 键），**未新增生产 DB 表/字段** | PASS：强杀重开提示「已恢复上次未保存的草稿，含 2 张照片。」，2/9 缩略图真实渲染 |
+| L3-29 画廊卡 `+N` 角标 | 补单栏 `EntryRow`，抽 `extraPhotoCount` 纯函数统一单双栏口径 | PASS：单栏 `+1`、双栏 `+1`、单图无角标 |
+| L3-36 运行时切主题不重绘 | 系统性清掉模块顶层静态 `StyleSheet`，改走 `themedStyles` 工厂 | PASS：深色→浅色**不重启**，徽章/chip/状态栏即时变浅 |
+| L3-39 详情页深色下顶部白底 | 新增 `src/components/systemBars.ts`，StatusBar + Android 窗口底色随明暗 | PASS：深色详情页顶部纯黑 + 白图标 |
+| L3-61 同步缺「无网络」前置 | 新增 `networkGate.ts` + `no_network` skip reason；探针拿不到状态时**放行** | PASS：飞行模式显示「无网络连接，已跳过本轮同步。」 |
+| L3-64 分享链路未交付 | 接线 `shareActions`/`shareLink`（前缀 `/s/p/`、`/s/l/` 与 Web 端逐字对齐）；加 `sharePublication` 判「未发布/未配置云端」 | PASS：系统 Share Sheet 真弹出；撤销后按钮消失只剩失效文案；再分享＝重新生成快照；列表页有效行两枚按钮、已撤销行无按钮 |
+| **新 P1** 登录后卡在 `auth/callback` | 新增 `authReturn.ts`，成功/取消/已处理过三终态 `router.replace` 回主界面 | PASS：从 Google 回来直接落在「我的」页 |
+| **新 P1** PKCE 用 `plain` | 新增 `supabase/pkce.ts`，改 **S256**，每次授权生成新 verifier，落 SecureStore | 间接 PASS：Supabase 接受授权并 302 到 Google 账号选择页；严格向量断言靠 RFC 7636 单测 |
+
+- **又修 2 个真机新发现（第 3 笔提交 `421ceb8`）**：
+  - **登录态语义**：`account.showLogin` 收敛按钮可见性 → 登录成功后只显示「退出登录」；徽章按真实连接状态显示「待同步」，不再在有失败待传时显示「仅本机」。
+  - **失败记录口径**：`status.ts` 的 `failedEntities` 改读 `outbox.last_error`，与摘要「失败 N 项」同源；真机从 `0 条` 变 `2 条` 且带错误原文。
+- **验证基线**：`npx tsc --noEmit` **0 报错**；`npx jest` **57 套件 / 529 用例全绿**。
+- **构建铁律（本轮踩坑）**：改 JS 后必须
+  `./gradlew ... :app:createBundleReleaseJsAndAssets --rerun-tasks assembleRelease`
+  ——**不带 `--rerun-tasks` 会误判 up-to-date 出旧包**（我因此装了一次旧包，md5 没变才发现）。现役包 md5 `22a5f309855e0c92ed718acbab875e99`。
+- **云端配置进包**：`mobile/.env.local`（已被 `.gitignore` 覆盖）写了 `EXPO_PUBLIC_SUPABASE_URL` + `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`，值取自线上 PWA bundle（客户端本来就是公开的 publishable key，不是 secret）。**重新出包时必须先建这个文件**，否则包里云端未配置。
+- **提交情况**：`abf9249`(docs) → `d3f347f`(P0+4P1) → `421ceb8`(登录态+失败口径)。⚠️ 2026-10-14 `git fetch` 后确认本地分支与 `origin/master` **已分叉**（远端另有 4 个提交，本地 3 个），并非「领先 3 个」。另有一批**未提交**的交接文档改动：`docs/handoff/HANDOFF.md` + `coordination/STATE.md`（即本节与 STATE 顶部快照），等用户授权再提交。
+
+**收工时的设备与数据状态（两台手机并存，别搞混）**
+
+| 设备 | 锁定状态 | 装的包 | 数据与遗留 |
+|---|---|---|---|
+| **Redmi Note 12T Pro**（`23054RA19C`，Android 15） | ✅ **现役锁定目标**（2026-10-14 用户口令「note12tpro 安装最新版」） | release md5 `22a5f309…`，`lastUpdateTime` 2026-10-14 11:02，**已覆盖装最新包** | 8 条记录（5 条用户真实 + 3 条 L3 验收造的 `L3` 前缀数据）；**无同步冲突**；停 Metro + `adb reverse --remove-all` 冷启动正常渲染，standalone 已验 |
+| Redmi Note 12 Pro（`23054RA19C` 之外的 pearl 机，Android 14） | 未锁定（不是目标机） | release md5 `22a5f309…`（同包） | 1 条用户记录 + 1 条 `L3AuthText` 测试记录；**31 个同步冲突待裁决**；标签上传撞 `tags_dim_owner_fk` 外键 |
+
+> 10 项修复的真机复验是在 **Note 12 Pro** 上做的；Note 12T Pro 只做了「装包 + 独立冷启动渲染」，**尚未逐项复验**。两台机云端登录态不同（12T Pro 上的 session 是老包留下的）。
+
+**遗留的真问题：已定位（2026-10-14 收工前定案，用户决定暂不修）**
+
+- 症状（仍存在）：Note 12 Pro 上传报 `tags insert: violates foreign key constraint "tags_dim_owner_fk"`，`upsert_tags`(outbox seq 13) 与 `upsert_entry`(seq 15) 各 attempts 3 失败；「同步冲突」31 个待裁决。
+- **根因是第三种，甲乙都不对**：`pushCoreEntity` 把「条件更新 0 行」静默吞成冲突，导致本机维度**从未补插上云**。
+  - 铁证：本机 4 个维度 id `634d9c2a`人群 / `00750d71`地区 / `437bb1ef`场景 / `0a40f9ee`类型；云端 5 个维度 id `cfd723b5`人群 / `5449118e`地区 / `4f7c7820`场景 / `804a2cbe`场景 / `167533be`类型 —— **同名但 id 零重合**（云端那套由另一端生成）。
+  - 链条：① 本机 4 个维度 `base_revision=0`（非 null）→ `expected=0` 被判「云端已有」→ **跳过 INSERT** 直接 `updateIfRevision`（`supabaseTransport.ts:223-226`）；② 云端无此 id → 0 行 → 记冲突 + 本地标 `conflict` + **`return` 不抛错**（`:253-262`）；③ 维度没上云 → 紧随的 `tags insert` 撞复合外键 `FOREIGN KEY (dimension_id, owner_user_id) → tag_dimensions(id, owner_user_id)`。
+  - 本机 3 个维度状态 `conflict`、1 个还是 9 月前的 `synced`（云端被清后本地状态没回退），与此完全吻合。
+- **云端取证（2026-10-14，走本机已登录的 supabase CLI → Management API，只读）**：`habit_tracker.tag_dimensions` 5 行、`tags` 29 行、`entry_tags` 5、`entries` 9、`media` 16，owner 全为当前账号，**云端无孤儿标签**。即「9 月云端大扫除」这个前提对当下已不成立。
+- **修复方案（未实施）**：`pushCoreEntity` 0 行更新时若远端确实无此行 → **回退 INSERT** 重试，仍失败才抛错。约 10 行，不动用户数据。第二层「同名不同 id 对齐」需数据迁移，风险更高。
+- **影响范围**：**仅 Note 12 Pro**。用户主力机 **Note 12T Pro 完全正常**（29 标签 / 9 记录 / 16 照片全已同步，0 冲突 0 失败）。用户口径：「主力机没问题就行了」→ 决定暂不修。
+- **取证手段（本轮新踩）**：release 包 `run-as` 被拒 → 出 **debuggable 包**（`-PreactNativeArchitectures=arm64-v8a` 单 ABI 才建得出来）装上读 `files/SQLite/place-journal.db`（连 `-wal` `-shm` 一起 `run-as cat`），读完**必须装回 release 包并核 md5**（同签名 `install -r`，数据不丢）。备份 `temp/app-release-keep.apk` md5 `22a5f309…`。
+- **冲突裁决**：点「采用云端」会被 App 自己拦住（「云端行已不存在…请选择保留本地」），「全部采用云端」对这批不可用。用户维持「先放着」。
+
+**builder 派工指令（用户 2026-10-14 下达，现役）**
+
+> 主用 **opencode go** + `opencode-go/deepseek-v4.1-flash`；备用 **codebuddy** + deepseek-v4.1-flash。**不得修改母版真源，直接按此派工即可。**
+
+实测：`opencode --model opencode-go/deepseek-v4.1-flash` 在本机报 `Unexpected server error`（server 侧问题，非命令写法问题）。备用通道 `codebuddy`（v2.160.0）可用。Orca 终端派工命令模板见 §0.D。
+
 ### 0.B 下一步任务（按优先级）
 
 | # | 任务 | 状态／说明 |
 |---|---|---|
+| 0 | ~~标签上传外键 `tags_dim_owner_fk` 根因定位~~ | ✅ **2026-10-14 已定性**（第三种根因：`pushCoreEntity` 把 0 行更新静默吞成冲突；本机 4 个维度 id 与云端 5 个同名零重合，维度从未补插 → tags 撞复合外键）。**仅影响 Note 12 Pro；用户主力机 Note 12T Pro 无此问题。修复方案已写明，用户决定暂不修** |
+| 0b | **31 个同步冲突的处置** | 用户已选「先放着」，且主力机是 12T Pro，暂无需求动 Note 12 Pro |
+| 0c | **本地 3 个提交合入 `origin/master`** | ⚠️ 2026-10-14 `git fetch` 后确认**已分叉**：远端 4 个提交本地没有（含 `a856f32` 改用**自建发布密钥**签名 + README 挂 v0.1.0 安装包），本地 3 个远端没有。不能直推，需先 merge/rebase；**且注意换签名后本机 debug.keystore 签的包将无法 `install -r` 覆盖升级** |
+| 0d | ~~在 Note 12T Pro 上逐项复验 10 项修复~~ | ✅ **2026-10-14 完成，8 项实测 PASS**，2 项（auth/callback 回落、PKCE S256）需用户在场走 Google OAuth |
+| 0e | **补验未覆盖项** | L3-43 重复回调重放（旧机验过，新包未单独验）；L3-46/47 双账号 owner mismatch（两台机上都有第二个 Google 账号 `tahrarockhold206@…` 可用）；跨端 Web→Android 拉取与并发冲突（需第二写入端） |
+| 0f | **提交交接文档改动** | `docs/handoff/HANDOFF.md` + `coordination/STATE.md` 当前处于**未提交**状态，等用户授权 |
 | 1 | **分支归位** | ✅ **已完成**（2026-10-03）→ HEAD=`wanghoufan/master`。做法与坑见 §0.A.4① |
 | 2 | **push `b031fcc`** | ✅ **已完成**（用户授权「4 可以」），连同本轮 4 个 commit 一起推 |
 | 3 | **底部 tab 图标** | ✅ **已完成**（选「参考 PWA」）→ `TabIcons.tsx` + react-native-svg，398 tests 绿，两台真机 md5 一致、dump 无 `⏷`。详见 §0.A.4② |
@@ -160,6 +221,18 @@ APK 产物路径：`mobile/android/app/build/outputs/apk/release/app-release.apk
 13. **缺字形/字体类问题**：`uiautomator dump` 的 `text=` 会直接暴露占位字符（`⏷`），比截图放大更快定位。
 14. 用户可见要求要**逐条给覆盖证据**（含截图），不能只看构建成功。
 
+**本轮新增规矩（2026-10-13～14 实测有效，别退回）**
+
+14b. **改完 JS 必须 `--rerun-tasks` 打 bundle**：`./gradlew ... :app:createBundleReleaseJsAndAssets --rerun-tasks assembleRelease`。Gradle 对 `.env.local` 之类输入不敏感，会误判 up-to-date 出**旧包**。装机后**先核 md5** 再开始测，我因此白测过一轮。
+14c. **装机前先核 md5**：`md5 -q mobile/android/app/build/outputs/apk/release/app-release.apk`，与 Worker 报的对上才装。
+14d. **真机自动化每次点击前重新 `uiautomator dump` 并校验 bounds 合法性**：滚出视口的节点会报**倒置 bounds**（如 `[188,270][274,33]`，y1>y2），据此算的坐标全错。判据：`y1 < y2 且 100 < y1 < 2200`，不满足就小幅滚动重取。
+14e. **RN 的多行文本 uiautomator 可能报空 `text=`**：失败明细明明渲染了，dump 却是空 TextView。**必须截图肉眼复核**，不能只信 dump。
+14f. **手机开 NekoBox VPN 时，Supabase 的 TLS 会间歇失败**（`SSLHandshakeException: connection closed` / `ERR_TIMED_OUT`），Google 又必须走 VPN 才通——**关 VPN 连不上 Google、开 VPN 连不上 Supabase**。实测偶发通，重试即可；不要擅自改用户的代理配置。
+14g. **`adb shell cmd connectivity airplane-mode enable/disable`** 可直接切飞行模式；每次离线用例前后都要复验 `settings get global airplane_mode_on`（旧机上它曾被系统自动关断，把离线用例悄悄废掉）。
+14h. **造测试数据一律用 ASCII 前缀**（如 `L3`/`L4`），`adb input text` 无法输入中文，搜狗输入法还会吞字。
+14i. **不删用户真实数据**：只删自己造的带前缀记录；测完回收自己产生的分享快照（逐条撤销）。
+14j. **手机上有两个 Google 账号**：`wanghoufan13@…`（本 App 绑定，owner `3e0acd69…`）、`tahrarockhold206@…`（可做 owner mismatch 走查）。选账号时按包名认第一个，别点错。
+
 **红线（沿用）**
 
 15. 全部 Supabase 查询走 `supabase.schema('habit_tracker')`；禁止业务表进 `public`；禁止整库回写；`service_role` 绝不进前端/Git；密钥只进 `.env.local` / Vercel 变量。
@@ -171,48 +244,82 @@ APK 产物路径：`mobile/android/app/build/outputs/apk/release/app-release.apk
 见对话交付副本；此处为常驻版本：
 
 ```text
-你是「个人打卡小工具」（PWA + 安卓 App 双端）的接续开发者。工作目录
-/Users/zzymima0000/Developer/coding/1.Active/011-ing-个人打卡小工具
+你是「个人打卡小工具」（PWA + 安卓 App 双端）的接续开发者。
+工作目录：/Users/zzymima0000/Developer/coding/1.Active/master-2
+分支：master-2（与 origin/master **已分叉**：远端有 4 个本地没有的提交，本地有 3 个远端没有的提交）
 
-【第 0 步，必须先做，否则全程走错】
-1) git rev-parse --abbrev-ref HEAD。当前极可能站在错分支 master(67900b0, 09-06)，
-   它落后 25 个提交、分叉点就是它自己、无任何独有提交。
-2) 最新代码在 wanghoufan/master(b031fcc, 09-22)，比 origin/master(d83d61d) 多 1 个
-   未推送的 README 提交。那 25 个提交几乎全是安卓端工作。
-3) 向用户确认是否切到 wanghoufan/master。切之前先 stash 4 个与新分支冲突的文档：
-   AGENTS.md / README.md / HANDOFF.md / docs/handoff/HANDOFF.md（09-29 治理规则注入，
-   两分支都未提交）。mobile/ 那 200+ 文件已 stage，内容与新分支逐字节一致，
-   切过去后会自动消失为无差异，不要单独提交它。
+【第 0 步，必读】
+docs/handoff/HANDOFF.md §0（现役快照，唯一权威）。重点看：
+- §0.A.7 第四阶段「修复 + 真机复验」已收工，8+2 项全过
+- §0.A.7 末尾「遗留的真问题」＝你这一轮的主任务
+- §0.C 第 6–17 条规矩，尤其 14b–14j 是本轮刚踩出来的坑
 
-【必读】docs/handoff/HANDOFF.md §0（现役快照，唯一权威），再按 §1 顺序补齐上下文。
+【当前状态，别重复劳动】
+代码基线：npx tsc --noEmit 0 报错；npx jest 57 套件 / 529 用例全绿。
+已有 APK：mobile/android/app/build/outputs/apk/release/app-release.apk
+         md5 22a5f309855e0c92ed718acbab875e99（含云端配置，已登录）
+真机：**Redmi Note 12T Pro** / Android 15，ADB 序列号 UKCESWB67PUO7LPB
+     （现役锁定目标；每次 ADB 前先
+      python3 ~/.claude/skills/android-device-target-lock-local-zh/android_device_lock.py status
+      再 resolve，所有 adb 命令必须显式 -s；序列号不得展示给用户；掉线时停止，不要自动换机）
+     该机已装最新包（md5 22a5f309…，11:02）但只验了冷启动渲染，10 项修复未逐项复验。
+     另有 Redmi Note 12 Pro（未锁定，Android 14）——31 个同步冲突和 tags_dim_owner_fk
+     外键失败都是在那台上测出来的；两台数据不同，别搞混。
+云端配置：mobile/.env.local（gitignored）已写 EXPO_PUBLIC_SUPABASE_URL +
+     EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY。重新出包前先确认这个文件在。
+三笔本地提交：abf9249(docs) / d3f347f(P0+4P1) / 421ceb8(登录态+失败口径)。与 origin/master 已分叉（远端另有 4 个提交，含 a856f32 改用自建发布密钥签名 + 挂 v0.1.0 安装包）。
 
-【两条等用户拍板的事，不要自己定】
-A. 底部 tab 图标：mobile/app/(tabs)/_layout.tsx 从未写过 tabBarIcon，expo-router
-   57.0.21 会渲染内置占位符 ⏷(U+23F7, MissingIcon.js)。两台机器因字体 fallback 不同，
-   一台空白一台豆腐块——同一 APK(md5 3e75fae5…)、同一 UI 树，不是版本分裂。
-   三选项：补真图标(需装 @expo/vector-icons) / tabBarIcon 传空组件保持纯文字 / 不动。
-B. 分支是否归位 + 是否 push b031fcc。
+【本轮主任务：标签上传外键根因（最高优先级）】
+症状：真机同步报
+  tags insert: insert or update on table "tags"
+  violates foreign key constraint "tags_dim_owner_fk"
+  （upsert_tags、upsert_entry 各 1 条失败）；同时「同步冲突」涨到 31 个待裁决。
+根因线索（已查清）：9 月云端大扫除清空了云端 tag_dimensions/tags，本机还留 27 个标签。
+  代码里维度先于标签推（mobile/src/sync/supabaseTransport.ts:332），推失败会抛错（:237）。
+两个候选，必须定死一个：
+  甲：pushCoreEntity 第一行 if (!local) return（:208）静默跳过本地已无的维度行 → 孤儿标签撞外键
+  乙：维度行在，但 dim_id / owner_user_id 对不上
+卡点：区分甲乙要读本机 SQLite，release 包 run-as 被拒。
+三条路（先问用户选哪条，别自己定）：
+  ① 用户在 Supabase Studio 看 habit_tracker.tag_dimensions / tags 的行数
+  ② 出一个 debuggable 验收包读本机 DB（仅自用不发布，约 10 分钟）
+  ③ 先记档进下一轮
+注意：冲突裁决页点「采用云端」会被 App 拦（云端行已不存在），
+  只有「保留本地」可用；用户已明确「先放着」，不要擅自裁决。
 
-【已知可直接接手的活】
-- mobile/android/ 任何分支都查不到（0 提交，被 .git/info/exclude:9 排除）。
-  建议移除该排除后入库——这是安卓端唯一未备份部分。
-- 自用出包一律 ./gradlew assembleRelease（build.gradle 里 release 就签 debug.keystore，
-  合法）。debug 包不含 bundle，装上黑屏。Docker 占 8081/8082 不得关闭，Metro 用 8083
-  + adb reverse tcp:8081 tcp:8083。SDK 在 ~/android-toolchain/sdk，4 个 ABI 约 5-6 分钟。
-- 装完必须独立验证：停 Metro + adb reverse --remove-all + 重启 app。
-- PWA 三件未闭环：改名退回验证(已修两轮，待用户实测，认「我的页底前端版本号」)、
-  封面白边(待用户放放大截图定责)、高德两端目验(灰底查白名单)。
+【构建与装机铁律】
+- 改完 JS 必须带 --rerun-tasks 打 bundle，否则 Gradle 误判 up-to-date 出旧包：
+  cd mobile/android && ./gradlew --no-daemon \
+    -Dorg.gradle.jvmargs='-Xmx4096m -XX:MaxMetaspaceSize=1536m' \
+    -Dkotlin.daemon.jvm.options='-Xmx2048m' \
+    :app:createBundleReleaseJsAndAssets --rerun-tasks assembleRelease
+- 装机前先 md5 -q 核对 APK，与出包方报的一致才装。
+- Docker 占 8081/8082 不得关闭；Metro 一律 8083 + adb reverse tcp:8081 tcp:8083。
+- SDK 在 ~/android-toolchain/sdk；JDK 17。
+- 装完必须独立验证：停 Metro + adb reverse --remove-all + 重启 App。
 
-【规矩】未经用户明确要求不得 git commit/push；临时文件放仓内 temp/；
-Supabase 查询一律 supabase.schema('habit_tracker')，service_role 绝不进前端或 Git；
-未授权禁动 Services/、DockerData/、DockerBackups。
+【builder 派工（用户 2026-10-14 指令，不得改母版真源）】
+主用 opencode go + opencode-go/deepseek-v4.1-flash；备用 codebuddy + deepseek-v4.1-flash。
+实测：opencode --model opencode-go/deepseek-v4.1-flash 在本机报 Unexpected server error，
+  先试备用 codebuddy。Orca 终端派工：
+  HANDLE=$(orca terminal create --json | python3 -c "import json,sys; print(json.load(sys.stdin)['result']['terminal']['handle'])")
+  orca terminal send --terminal $HANDLE --text "codebuddy" --enter
+  orca terminal send --terminal $HANDLE --text "<任务提示词>" --enter
 
-【本轮三个教训，别重犯】
-1) git diff <ref> -- <path> 的方向是 ref→工作区，- 侧才是 ref 的内容，我因此差点把
-   旧版 stash 当最新版恢复。
-2) 查「某分支有没有代码」要 git ls-tree -r <branch>；我查了本地 master 就断言
-   「GitHub 上是空的」，实际 origin/master 有 135 个 mobile 文件。
-3) 恢复/装机前没核对 tab 图标状态，装完才报，用户看到的「变样」本可提前避免。
+【规矩】
+- 未经用户明确要求不得 git commit / push（push 需二次确认）。
+- 临时文件放仓内 temp/，不要用 /tmp。
+- 不删用户真实数据；造测试数据用 ASCII 前缀；测完回收自己产生的分享快照。
+- Supabase 查询一律 supabase.schema('habit_tracker')；service_role 绝不进前端或 Git。
+- 未授权禁动 Services/、DockerData/、DockerBackups；不擅自改用户 VPN 代理配置。
+- 不得在报告/截图/日志里出现完整 token、密钥、完整账号 ID（3e0acd69… 这类截断形式可用）。
+
+【本轮教训，别重犯】
+1) 改 JS 不带 --rerun-tasks 会出旧包——我装了一次旧包、白测一轮才靠 md5 发现。
+2) uiautomator 对滚出视口的节点报倒置 bounds（y1>y2），据此算坐标全错；每次点击前重新 dump 并校验。
+3) RN 多行文本 uiautomator 可能报空 text=，必须截图肉眼复核，不能只信 dump。
+4) 开 VPN 连不上 Supabase、关 VPN 连不上 Google，OAuth 那步靠重试而非改代理配置。
+5) 「全部采用云端」对「云端已删除」型冲突不可用，App 会自己拦。
 ```
 
 ---
