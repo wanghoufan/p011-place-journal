@@ -20,9 +20,9 @@ import { newUuid } from '@/domain/ids'
 import { createExpoMediaFileSystem } from '@/media/localFiles'
 import { createExpoImageProcessor } from '@/media/processImage'
 import { persistPickedMedia } from '@/media/mediaService'
-import { AppButton, Card, Chip, ErrorState, SectionTitle, Stars, TextField } from '@/components/ui'
+import { AppButton, Card, Chip, ErrorState, GroupedTagPicker, SectionTitle, Stars, TextField } from '@/components/ui'
 import { clearDraft, markDraftSaved, takeDraft, type RecordDraft } from '@/features/draft'
-import { leafTags, toggleTagId, validateRecordForm } from '@/features/form'
+import { toggleTagId, validateRecordForm } from '@/features/form'
 import { listPlaceOptions, listTagsGrouped, type PlaceOption, type TagGroup } from '@/features/queries'
 import { parseOptionalBudget, todayIso } from '@/features/format'
 import { AI_API_TIMEOUT_MS, runOrganise, type OrganiseSuggestion } from '@/features/organise'
@@ -254,7 +254,6 @@ export default function AiConfirmScreen() {
     }
   }, [budget, draft, newPlaceArea, newPlaceName, notePrivate, notePublic, placeId, rating, saving, summary, tagIds, visitDate])
 
-  const selectableTags = leafTags(tagGroups)
   const busy = phase === 'organising'
   const showResult = phase === 'review' || phase === 'skipped'
 
@@ -386,16 +385,11 @@ export default function AiConfirmScreen() {
               placeholder="如：夜晚舒服、适合拍照的平价咖啡厅"
             />
             <Text style={styles.fieldHint}>标签</Text>
-            <View style={styles.chipWrap}>
-              {selectableTags.map((tag) => (
-                <Chip
-                  key={tag.id}
-                  label={tag.name}
-                  active={tagIds.includes(tag.id)}
-                  onPress={() => setTagIds((ids) => toggleTagId(ids, tag.id))}
-                />
-              ))}
-            </View>
+            <GroupedTagPicker
+              groups={tagGroups}
+              selectedIds={tagIds}
+              onToggle={(tagId) => setTagIds((ids) => toggleTagId(ids, tagId))}
+            />
             {unmatched.length > 0 ? (
               <View style={styles.unmatchedBlock}>
                 <Text style={styles.fieldHint}>没找到匹配标签（点一下才建，AI 不会自动建）</Text>

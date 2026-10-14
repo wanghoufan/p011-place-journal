@@ -6,6 +6,7 @@ import Lightbox from '../components/Lightbox'
 import { repo, bulkPut, enqueue } from '../lib/idb'
 import { uuid } from '../lib/uuid'
 import { createSingleShare, shareUrl, copyText } from '../lib/shares'
+import { mergeDimensionGroups } from '../lib/search'
 import { renderShareCard, saveOrShareBlob, THEMES } from '../lib/shareCard'
 import type { CardTheme } from '../lib/shareCard'
 import type { MediaItem, ShareSnapshot, Tag } from '../lib/types'
@@ -58,6 +59,10 @@ export default function EntryDetail() {
   const headline = entry.notePublic || entry.summary || entry.transcript
   // 仅叶子标签可选（父标签是分组容器，与 AiConfirm 口径一致）
   const selectableTags = data.tags.filter((t) => !data.tags.some((x) => x.parentId === t.id))
+  // 按维度分组展示（同标签管理页的分组与顺序），避免整片摊开漏选
+  const selectableTagGroups = mergeDimensionGroups([...data.dimensions].sort((a, b) => a.sortOrder - b.sortOrder))
+    .map(({ dim, ids }) => ({ dim, tags: selectableTags.filter((t) => ids.includes(t.dimensionId)) }))
+    .filter((section) => section.tags.length > 0)
 
   function startEdit() {
     if (!entry) return
@@ -244,18 +249,25 @@ export default function EntryDetail() {
               </div>
               <div>
                 <p className="text-sm font-bold mb-2">标签</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectableTags.map((t) => (
-                    <button key={t.id} type="button"
-                      onClick={() => setFTagIds((ids) => ids.includes(t.id) ? ids.filter((x) => x !== t.id) : [...ids, t.id])}
-                      className={`px-2.5 py-1 rounded-full text-xs border ${fTagIds.includes(t.id) ? 'bg-terra text-white border-terra' : 'bg-card border-line text-inkmuted'}`}>
-                      {t.parentId ? '└ ' : ''}{t.name}
-                    </button>
+                <div className="space-y-2.5">
+                  {selectableTagGroups.map(({ dim, tags }) => (
+                    <div key={dim.id} className="border-l-2 border-line pl-2.5">
+                      <p className="text-xs font-bold mb-1">{dim.name}<span className="font-normal text-inkmuted"> · {tags.length}</span></p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {tags.map((t) => (
+                          <button key={t.id} type="button"
+                            onClick={() => setFTagIds((ids) => ids.includes(t.id) ? ids.filter((x) => x !== t.id) : [...ids, t.id])}
+                            className={`px-2.5 py-1 rounded-full text-xs border ${fTagIds.includes(t.id) ? 'bg-terra text-white border-terra' : 'bg-card border-line text-inkmuted'}`}>
+                            {t.parentId ? '└ ' : ''}{t.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   ))}
-                  {/* 现场建标签：没有合适标签时不必跑去标签页（2026-09-05 用户需求） */}
-                  <button type="button" onClick={() => { setNewTagName(''); setNewTagOpen(true) }}
-                    className="px-2.5 py-1 rounded-full text-xs border border-dashed border-terra text-terra">＋ 新标签</button>
                 </div>
+                {/* 现场建标签：没有合适标签时不必跑去标签页（2026-09-05 用户需求） */}
+                <button type="button" onClick={() => { setNewTagName(''); setNewTagOpen(true) }}
+                  className="mt-2 px-2.5 py-1 rounded-full text-xs border border-dashed border-terra text-terra">＋ 新标签</button>
               </div>
               <div className="flex gap-3 pt-1">
                 <button className="btn-primary flex-1 py-3" disabled={saving} onClick={saveEdit}>{saving ? '保存中…' : '保存修改'}</button>
@@ -367,7 +379,7 @@ export default function EntryDetail() {
           <div>
             <p className="text-sm font-bold mb-1.5">归属维度</p>
             <div className="flex flex-wrap gap-1.5">
-              {[...(data?.dimensions ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map((d) => (
+              {mergeDimensionGroups([...(data?.dimensions ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)).map(({ dim: d }) => (
                 <button key={d.id} type="button"
                   onClick={() => setNewTagDimId(d.id)}
                   className={`px-2.5 py-1 rounded-full text-xs border ${(newTagDimId ?? defaultDimId) === d.id ? 'bg-terra text-white border-terra' : 'bg-card border-line text-inkmuted'}`}>

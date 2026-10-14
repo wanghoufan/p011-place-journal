@@ -16,6 +16,7 @@ import {
   ConfirmDialog,
   EmptyState,
   ErrorState,
+  GroupedTagPicker,
   InlineTagCreator,
   LoadingState,
   SectionTitle,
@@ -23,7 +24,7 @@ import {
   SyncBadge,
   TextField,
 } from '@/components/ui'
-import { leafTags, toggleTagId } from '@/features/form'
+import { toggleTagId } from '@/features/form'
 import { formatVisitDate, parseOptionalBudget, syncLabel } from '@/features/format'
 import {
   countEntriesForPlace,
@@ -235,7 +236,6 @@ export default function EntryDetailScreen() {
   if (!detail) return <EmptyState icon="🗂" title="记录不存在或已被删除" hint="它可能已在本机删除。" />
 
   const entry = detail.entry
-  const selectableTags = leafTags(tagGroups).filter((tag) => tag.dimensionId)
   const tagName = (tagId: string) => tagGroups.flatMap((g) => g.tags).find((t) => t.id === tagId)?.name ?? tagId
   const moveTarget = placeId !== '' && placeId !== entry.placeId ? places.find((p) => p.id === placeId) : undefined
   const query = placeQuery.trim()
@@ -310,19 +310,14 @@ export default function EntryDetailScreen() {
               <Stars value={rating} editable size={26} onChange={setRating} />
             </View>
             <TextField label="预算（人均元）" value={budget} onChangeText={setBudget} keyboardType="number-pad" />
-            <TextField label="私密感受" value={notePrivate} onChangeText={setNotePrivate} multiline minHeight={100} />
-            <TextField label="公开理由" value={notePublic} onChangeText={setNotePublic} multiline minHeight={70} />
+            <TextField label="私密感受" value={notePrivate} onChangeText={setNotePrivate} multiline autoGrow minHeight={100} />
+            <TextField label="公开理由" value={notePublic} onChangeText={setNotePublic} multiline autoGrow minHeight={70} />
             <Text style={styles.fieldHint}>标签</Text>
-            <View style={styles.chipWrap}>
-              {selectableTags.map((tag) => (
-                <Chip
-                  key={tag.id}
-                  label={tag.name}
-                  active={tagIds.includes(tag.id)}
-                  onPress={() => setTagIds((ids) => toggleTagId(ids, tag.id))}
-                />
-              ))}
-            </View>
+            <GroupedTagPicker
+              groups={tagGroups}
+              selectedIds={tagIds}
+              onToggle={(tagId) => setTagIds((ids) => toggleTagId(ids, tagId))}
+            />
             <InlineTagCreator busy={creatingTag} onCreate={addTag} />
             <View style={styles.actions}>
               <AppButton label={saving ? '保存中…' : '保存修改'} onPress={save} loading={saving} style={styles.grow} />

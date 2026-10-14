@@ -164,6 +164,34 @@ describe('queries: 标签维度分组', () => {
     expect(groups[0].tags.map((t) => [t.name, t.usage])).toEqual([['安静', 1], ['热闹', 0]])
     expect(groups[1].tags).toHaveLength(0)
   })
+
+  // 双端/多设备各自播种「场景」→ 云端按 id 合并 → 本地残留同 kind 两条维度行。
+  // 标签页不应并列出现两个「场景」，故按 kind 归并为一个分组并合并标签。
+  it('同 kind 的系统维度归并为一个分组，标签全部并入', () => {
+    const { db, repo } = setup()
+    repo.saveCoreEntity('tag_dimensions', { id: 'dS1', name: '场景', kind: 'scene', sort_order: 0 })
+    repo.saveCoreEntity('tag_dimensions', { id: 'dT', name: '类型', kind: 'type', sort_order: 1 })
+    repo.saveCoreEntity('tag_dimensions', { id: 'dS2', name: '场景', kind: 'scene', sort_order: 2 })
+    repo.saveCoreEntity('tags', { id: 's1', dimension_id: 'dS1', name: '烧烤', sort_order: 0 })
+    repo.saveCoreEntity('tags', { id: 's2', dimension_id: 'dS2', name: '约会', sort_order: 0 })
+    repo.saveCoreEntity('tags', { id: 't1', dimension_id: 'dT', name: '美食', sort_order: 0 })
+
+    const groups = listTagsGrouped(db)
+
+    expect(groups.map((g) => g.dimension.name)).toEqual(['场景', '类型'])
+    expect(groups[0].dimension.id).toBe('dS1') // 归并分组取首个（sort_order 最小）维度
+    expect(groups.map((g) => g.tags.map((t) => t.name))).toEqual([['烧烤', '约会'], ['美食']])
+  })
+
+  it('custom 维度同名也各成一档（只归并系统维度）', () => {
+    const { db, repo } = setup()
+    repo.saveCoreEntity('tag_dimensions', { id: 'c1', name: '氛围', kind: 'custom', sort_order: 0 })
+    repo.saveCoreEntity('tag_dimensions', { id: 'c2', name: '氛围', kind: 'custom', sort_order: 1 })
+
+    const groups = listTagsGrouped(db)
+
+    expect(groups.map((g) => g.dimension.id)).toEqual(['c1', 'c2'])
+  })
 })
 
 describe('queries: 过滤与计数', () => {

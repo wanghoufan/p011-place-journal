@@ -6,6 +6,7 @@ import { PageHeader, useDBData, Sheet } from '../components/ui'
 import { uuid } from '../lib/uuid'
 import { repo } from '../lib/idb'
 import type { Tag } from '../lib/types'
+import { mergeDimensionGroups } from '../lib/search'
 
 const KIND_LABEL: Record<string, string> = { region: '地区（系统）', type: '类型', scene: '场景', crowd: '人群', custom: '自定义' }
 
@@ -22,6 +23,9 @@ export default function TagsPage() {
 
   if (!data) return null
   const dims = [...data.dimensions].sort((a, b) => a.sortOrder - b.sortOrder)
+
+  // 同 kind 的系统维度归并为一张卡片（标签全部并入），见 mergeDimensionGroups。
+  const dimGroups = mergeDimensionGroups(dims)
 
   const allTags = data!.tags
   // 标签被记录引用的次数（叶子标签各自计数），用于行尾展示与删除确认文案
@@ -70,8 +74,8 @@ export default function TagsPage() {
       <PageHeader title="标签与维度" back right={<button className="chip" onClick={() => setDimOpen(true)}>＋ 维度</button>} />
       <p className="px-5 text-xs text-inkmuted mb-3">点标签可改名、删除；父标签还能加子标签。</p>
       <div className="px-5 space-y-4">
-        {dims.map((d) => {
-          const parents = data.tags.filter((t) => t.dimensionId === d.id && !t.parentId)
+        {dimGroups.map(({ dim: d, ids }) => {
+          const parents = data.tags.filter((t) => ids.includes(t.dimensionId) && !t.parentId)
           return (
             <div key={d.id} className="card-paper p-4">
               <div className="flex items-center justify-between mb-2">

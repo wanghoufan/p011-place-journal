@@ -8,7 +8,7 @@ import type { ReactTestRendererJSON } from 'react-test-renderer'
 import type { ComponentProps } from 'react'
 import { StyleSheet, TextInput, View } from 'react-native'
 
-import { AppButton, Chip, InlineTagCreator, MULTILINE_LINE_HEIGHT, SyncBadge, TextField, multilineLinesFor } from '../ui'
+import { AppButton, Chip, InlineTagCreator, MULTILINE_LINE_HEIGHT, MULTILINE_PAD_V, SyncBadge, TextField, multilineLinesFor } from '../ui'
 import { ThemeProvider, useTheme } from '../../themeProvider'
 import { colors, DARK_PALETTE, PALETTES, setActivePalette, themedStyles } from '../../theme'
 
@@ -206,6 +206,42 @@ describe('TextField 多行高度', () => {
     const fallback = renderField({ multiline: true })
     expect(fallback.input.props.numberOfLines).toBe(3)
     TestRenderer.act(() => fallback.renderer.unmount())
+  })
+
+  it('非 autoGrow 多行框不订阅内容高度（旧口径零改动）', () => {
+    const { renderer, input } = renderField({ multiline: true, minHeight: 120 })
+    expect(input.props.onContentSizeChange).toBeUndefined()
+    expect(input.props.scrollEnabled).toBeUndefined()
+    TestRenderer.act(() => renderer.unmount())
+  })
+
+  it('autoGrow：不封顶 3 行，空值回落 minHeight、有内容按内容高＋上下留白撑高', () => {
+    const { renderer, input } = renderField({ multiline: true, minHeight: 100, autoGrow: true })
+    const empty = StyleSheet.flatten(input.props.style) as Record<string, unknown>
+    // 关键：不传 numberOfLines（Android setLines 会把高度钉死），改由内容高驱动
+    expect(input.props.numberOfLines).toBeUndefined()
+    expect(input.props.scrollEnabled).toBe(false)
+    expect(typeof input.props.onContentSizeChange).toBe('function')
+    expect(empty.minHeight).toBe(100)
+    expect(empty.paddingBottom).toBe(MULTILINE_PAD_V)
+    expect(empty.height).toBeUndefined() // 空值不设 height，回落 minHeight
+
+    // 模拟原生回报内容高度 → height = 内容高 + 上下内边距
+    TestRenderer.act(() => {
+      input.props.onContentSizeChange({ nativeEvent: { contentSize: { width: 300, height: 210 } } })
+    })
+    const grown = StyleSheet.flatten(renderer.root.findAllByType(TextInput)[0].props.style) as Record<string, unknown>
+    expect(grown.height).toBe(210 + 2 * MULTILINE_PAD_V)
+
+    // 内容变短（如删空）→ 高度缩回，但不低于 minHeight
+    TestRenderer.act(() => {
+      renderer.root.findAllByType(TextInput)[0].props.onContentSizeChange({
+        nativeEvent: { contentSize: { width: 300, height: 10 } },
+      })
+    })
+    const shrunk = StyleSheet.flatten(renderer.root.findAllByType(TextInput)[0].props.style) as Record<string, unknown>
+    expect(shrunk.height).toBe(100)
+    TestRenderer.act(() => renderer.unmount())
   })
 })
 

@@ -12,7 +12,7 @@ import {
   todayIso,
   truncate,
 } from '../format'
-import { leafTags, sortTagsByUsage, toggleTagId, validateRecordForm } from '../form'
+import { leafTags, leafTagsByGroup, sortTagsByUsage, toggleTagId, validateRecordForm } from '../form'
 import type { TagGroup } from '../queries'
 
 describe('format: 日期与状态', () => {
@@ -98,6 +98,26 @@ describe('form: 校验与标签', () => {
     ]
     expect(leafTags(groups).map((t) => t.id)).toEqual(['child'])
     expect(sortTagsByUsage(groups[0].tags).map((t) => t.id)).toEqual(['child', 'parent'])
+  })
+
+  it('leafTagsByGroup 按维度分组、只留叶子、跳过空组、保持顺序', () => {
+    const groups: TagGroup[] = [
+      {
+        dimension: { id: 'd1', name: '地区', kind: 'region', sortOrder: 0 },
+        tags: [{ id: 'r1', dimensionId: 'd1', parentId: null, name: '海口市', sortOrder: 0, usage: 3 }],
+      },
+      {
+        dimension: { id: 'd2', name: '场景', kind: 'scene', sortOrder: 1 },
+        tags: [
+          { id: 'p', dimensionId: 'd2', parentId: null, name: '户外', sortOrder: 0, usage: 0 },
+          { id: 'c', dimensionId: 'd2', parentId: 'p', name: '约会', sortOrder: 1, usage: 1 },
+        ],
+      },
+      { dimension: { id: 'd3', name: '空维度', kind: 'custom', sortOrder: 2 }, tags: [] },
+    ]
+    const sections = leafTagsByGroup(groups)
+    expect(sections.map((s) => s.group.dimension.id)).toEqual(['d1', 'd2'])
+    expect(sections.map((s) => s.tags.map((t) => t.id))).toEqual([['r1'], ['c']])
   })
 })
 

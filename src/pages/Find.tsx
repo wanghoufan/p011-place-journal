@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader, Stars, useDBData, Cover, EmptyState } from '../components/ui'
-import { parseQueryWithKinds, matchEntries, type Filters } from '../lib/search'
+import { parseQueryWithKinds, matchEntries, mergeDimensionGroups, type Filters } from '../lib/search'
 import { Sheet } from '../components/ui'
 import { createListShare, shareUrl, copyText, searchLine } from '../lib/shares'
 
@@ -86,9 +86,8 @@ export default function Find() {
         {/* 标签筛选：按维度分组（同类一组内换行、不同类另起一行），组内按使用频次排序；多选取交集，再点取消 */}
         <div className="space-y-2.5">
           {(() => {
-            const groups = [...data.dimensions]
-              .sort((a, b) => a.sortOrder - b.sortOrder)
-              .map((d) => ({ key: d.id, label: d.name, tags: filterTags.filter((t) => t.dimensionId === d.id) }))
+            const groups = mergeDimensionGroups([...data.dimensions].sort((a, b) => a.sortOrder - b.sortOrder))
+              .map((g) => ({ key: g.dim.id, label: g.dim.name, tags: filterTags.filter((t) => g.ids.includes(t.dimensionId)) }))
               .filter((g) => g.tags.length > 0)
             const orphans = filterTags.filter((t) => !data.dimensions.some((d) => d.id === t.dimensionId))
             if (orphans.length) groups.push({ key: '_other', label: '其他', tags: orphans })

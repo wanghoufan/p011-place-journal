@@ -61,6 +61,22 @@ export function leafTags(groups: TagGroup[]): TagWithUsage[] {
   return groups.flatMap((group) => group.tags.filter((tag) => !parents.has(tag.id)))
 }
 
+/**
+ * 按维度分组返回叶子标签，顺序与 `listTagsGrouped` 一致 —— 供记录/编辑/AI 确认的标签多选
+ * 一组一组地展示（对标标签管理页的分组），避免整片摊开漏选。空组不返回。
+ */
+export function leafTagsByGroup(groups: TagGroup[]): { group: TagGroup; tags: TagWithUsage[] }[] {
+  const parents = new Set<string>()
+  for (const group of groups) {
+    for (const tag of group.tags) {
+      if (tag.parentId) parents.add(tag.parentId)
+    }
+  }
+  return groups
+    .map((group) => ({ group, tags: group.tags.filter((tag) => !parents.has(tag.id)) }))
+    .filter((section) => section.tags.length > 0)
+}
+
 /** 全部标签（含父标签），供 Tags 页展示。 */
 export function allTags(groups: TagGroup[]): TagWithUsage[] {
   return groups.flatMap((group) => group.tags)

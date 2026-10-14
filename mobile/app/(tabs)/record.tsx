@@ -27,6 +27,7 @@ import {
   Card,
   Chip,
   ErrorState,
+  GroupedTagPicker,
   InlineTagCreator,
   SectionTitle,
   Stars,
@@ -35,7 +36,7 @@ import {
 import { Lightbox } from '@/components/Lightbox'
 import { consumeDraftSaved, setDraft } from '@/features/draft'
 import { clearPersistedDraft, loadPersistedDraft, savePersistedDraft } from '@/features/draftStore'
-import { aiNextGate, leafTags, toggleTagId, validateRecordForm } from '@/features/form'
+import { aiNextGate, toggleTagId, validateRecordForm } from '@/features/form'
 import { listPlaceOptions, listTagsGrouped, type PlaceOption, type TagGroup } from '@/features/queries'
 import { todayIso, parseOptionalBudget } from '@/features/format'
 import { createTagNamed, saveRecord } from '@/features/recordActions'
@@ -429,7 +430,6 @@ export default function RecordScreen() {
     ? places.filter((p) => `${p.name}${p.area ?? ''}`.includes(placeQuery.trim())).slice(0, 6)
     : places.slice(0, 6)
   const selectedPlace = places.find((p) => p.id === placeId)
-  const selectableTags = leafTags(tagGroups)
   // 按钮三态（文案即门槛，对标 Web Record）：缺地点 → 先选择地点；缺内容 → 添加照片或写写感受。
   const aiGate = aiNextGate({
     placeId: placeId ?? undefined,
@@ -567,6 +567,7 @@ export default function RecordScreen() {
             onChangeText={setNotePrivate}
             placeholder="用微信语音输入法直接说…"
             multiline
+            autoGrow
             minHeight={120}
           />
           <TextField
@@ -575,28 +576,19 @@ export default function RecordScreen() {
             onChangeText={setNotePublic}
             placeholder="如：夜景超美，适合拍照，人均也不贵…"
             multiline
+            autoGrow
             minHeight={80}
-            numberOfLines={3}
           />
         </View>
       </Card>
 
       <Card style={styles.section}>
         <SectionTitle right={<Text style={styles.muted}>已选 {tagIds.length}</Text>}>标签</SectionTitle>
-        {selectableTags.length === 0 ? (
-          <Text style={styles.muted}>还没有标签，可在下方现场新建。</Text>
-        ) : (
-          <View style={styles.chipWrap}>
-            {selectableTags.map((tag) => (
-              <Chip
-                key={tag.id}
-                label={tag.name}
-                active={tagIds.includes(tag.id)}
-                onPress={() => setTagIds((ids) => toggleTagId(ids, tag.id))}
-              />
-            ))}
-          </View>
-        )}
+        <GroupedTagPicker
+          groups={tagGroups}
+          selectedIds={tagIds}
+          onToggle={(tagId) => setTagIds((ids) => toggleTagId(ids, tagId))}
+        />
         <InlineTagCreator busy={creatingTag} onCreate={handleCreateTag} />
       </Card>
 

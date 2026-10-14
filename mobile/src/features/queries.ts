@@ -284,7 +284,15 @@ export function mediaUri(m: MediaDetail, size: 'thumb' | 'display' = 'thumb'): s
   return candidates.find((uri): uri is string => typeof uri === 'string' && uri.length > 0) ?? ''
 }
 
-/** 标签维度 + 标签（含被记录引用次数），供 Tags / Record / Find 复用。 */
+/**
+ * 标签维度 + 标签（含被记录引用次数），供 Tags / Record / Find 复用。
+ *
+ * 系统维度（kind ≠ custom）在语义上唯一——全站按 kind 取用（如 `find(d => d.kind === 'scene')`）。
+ * 但多来源各自可能建出同 kind 的维度行：演示/网页首启播种各建一套（随机 id），且现场新建标签
+ * 默认并入 `scene`（`createTagNamed` 缺省 kind='scene'，见 record/entry/ai-confirm），云端又只按
+ * id 合并，于是本机残留同 kind 重复行（实测标签页并列出现两个「场景」）。这里按 kind 归并为单一
+ * 分组，标签全部并入，避免同名系统维度重复并列；custom 维度允许同名多条，仍按 id 各成一档。
+ */
 export function listTagsGrouped(db: SqlDatabase): TagGroup[] {
   const dimensions = db.getAllSync<{ id: string; name: string; kind: string; sort_order: number }>(
     'SELECT id, name, kind, sort_order FROM tag_dimensions ORDER BY sort_order ASC, name ASC',
@@ -303,20 +311,37 @@ export function listTagsGrouped(db: SqlDatabase): TagGroup[] {
     usage.set(row.tag_id, (usage.get(row.tag_id) ?? 0) + 1)
   }
 
-  const groups: TagGroup[] = dimensions.map((d) => ({
-    dimension: { id: d.id, name: d.name, kind: d.kind, sortOrder: d.sort_order },
-    tags: tags
-      .filter((t) => t.dimension_id === d.id)
-      .map((t) => ({
-        id: t.id,
-        dimensionId: t.dimension_id,
-        parentId: t.parent_id,
-        name: t.name,
-        alias: opt(t.alias),
-        sortOrder: t.sort_order,
-        usage: usage.get(t.id) ?? 0,
-      })),
-  }))
+  const tagsByDimension = new Map<string, TagWithUsage[]>()
+  for (const t of tags) {
+    const list = tagsByDimension.get(t.dimension_id) ?? []
+    list.push({
+      id: t.id,
+      dimensionId: t.dimension_id,
+      parentId: t.parent_id,
+      name: t.name,
+      alias: opt(t.alias),
+      sortOrder: t.sort_order,
+      usage: usage.get(t.id) ?? 0,
+    })
+    tagsByDimension.set(t.dimension_id, list)
+  }
+
+  const groups: TagGroup[] = []
+  const groupByKey = new Map<string, TagGroup>()
+  for (const d of dimensions) {
+    const key = d.kind === 'custom' ? `id:${d.id}` : `kind:${d.kind}`
+    let group = groupByKey.get(key)
+    if (!group) {
+      group = {
+        dimension: { id: d.id, name: d.name, kind: d.kind, sortOrder: d.sort_order },
+        tags: [],
+      }
+      groupByKey.set(key, group)
+      groups.push(group)
+    }
+    const dimTags = tagsByDimension.get(d.id)
+    if (dimTags) group.tags.push(...dimTags)
+  }
   return groups
 }
 

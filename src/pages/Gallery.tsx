@@ -14,8 +14,9 @@ export default function Gallery() {
   const [mode, setMode] = useState<ViewMode>('entry')
   const [sceneId, setSceneId] = useState<string | null>(null)
 
-  const sceneDim = data?.dimensions.find((d) => d.kind === 'scene')
-  const scenes = data?.tags.filter((t) => t.dimensionId === sceneDim?.id) ?? []
+  // 场景筛选涵盖全部 scene 维度（同 kind 可能残留多行，勿只取首个）
+  const sceneDimIds = (data?.dimensions ?? []).filter((d) => d.kind === 'scene').map((d) => d.id)
+  const scenes = data?.tags.filter((t) => sceneDimIds.includes(t.dimensionId)) ?? []
   const sceneAll = useMemo(() => (sceneId ? expandTagIds([sceneId], data?.tags ?? []) : []), [sceneId, data])
 
   if (!data) return null

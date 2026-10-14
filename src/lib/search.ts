@@ -21,6 +21,30 @@ export function expandTagIds(rootIds: string[], tags: Tag[]): string[] {
   return [...out]
 }
 
+/**
+ * 合并同类系统维度：同一 kind（region/type/scene/crowd）只保留一个展示组，组内为同 kind 的全部维度 id；
+ * custom 维度各自独立。返回按首次出现顺序排列，`dim` 为组内代表（首个）维度。
+ *
+ * 系统维度语义唯一（全站按 kind 取用），但多来源各自可能建出同 kind 的维度行——网页首启播种、
+ * 演示数据播种、以及现场新建标签默认并入 scene，云端又按 id 合并，本机遂残留同 kind 重复行
+ * （表现为标签页并列两个「场景」）。展示前用本函数归并，标签全部并入，避免同名系统维度重复并列。
+ */
+export function mergeDimensionGroups(dims: Dimension[]): { dim: Dimension; ids: string[] }[] {
+  const byKey = new Map<string, { dim: Dimension; ids: string[] }>()
+  const groups: { dim: Dimension; ids: string[] }[] = []
+  for (const d of dims) {
+    const key = d.kind === 'custom' ? `id:${d.id}` : `kind:${d.kind}`
+    const hit = byKey.get(key)
+    if (hit) hit.ids.push(d.id)
+    else {
+      const g = { dim: d, ids: [d.id] }
+      byKey.set(key, g)
+      groups.push(g)
+    }
+  }
+  return groups
+}
+
 // 自然语言解析：预算 / 星级 / 标签名匹配；查父标签自动包含子标签
 export function parseQueryWithKinds(q: string, tags: Tag[], kindOf: (tag: Tag) => string): Filters {
   const f: Filters = { areaTagIds: [], typeTagIds: [], sceneTagIds: [], crowdTagIds: [], text: q.trim() || undefined }

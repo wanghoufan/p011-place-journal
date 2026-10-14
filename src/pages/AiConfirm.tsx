@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { PageHeader, Stars, useDBData } from '../components/ui'
 import { organize, localHeuristics } from '../lib/organize'
 import { repo } from '../lib/idb'
+import { mergeDimensionGroups } from '../lib/search'
 import { takeDraft, clearDraft } from '../lib/draft'
 import type { RecordDraft, Entry, Place, MediaItem } from '../lib/types'
 import { syncOnce, withTimeout } from '../lib/sync'
@@ -69,6 +70,14 @@ export default function AiConfirm() {
     const dimOf = (id: string) => data.dimensions.find((d) => d.id === id)
     return data.tags.filter((t) => ['scene', 'type', 'crowd', 'region'].includes(dimOf(t.dimensionId)?.kind ?? ''))
   }, [data])
+
+  // 按维度分组展示（同标签管理页的分组与顺序），避免整片摊开漏选
+  const tagSections = useMemo(() => {
+    if (!data) return []
+    return mergeDimensionGroups([...data.dimensions].sort((a, b) => a.sortOrder - b.sortOrder))
+      .map(({ dim, ids }) => ({ dim, tags: sceneAndTypeTags.filter((t) => ids.includes(t.dimensionId)) }))
+      .filter((section) => section.tags.length > 0)
+  }, [data, sceneAndTypeTags])
 
   if (!draft || !data) return null
   const placeName = draft.placeId ? data.places.find((p) => p.id === draft.placeId)?.name : draft.newPlaceName
@@ -160,16 +169,23 @@ export default function AiConfirm() {
               <span className="font-bold">🏷 标签</span>
               <span className="text-xs text-inkmuted">{selectedTagIds.length} 个</span>
             </div>
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {sceneAndTypeTags.map((t) => {
-                const on = selectedTagIds.includes(t.id)
-                return (
-                  <button key={t.id} className={`tag-chip ${on ? '!bg-terra !text-white' : ''}`}
-                    onClick={() => setSelectedTagIds((s) => (on ? s.filter((x) => x !== t.id) : [...s, t.id]))}>
-                    {t.name}
-                  </button>
-                )
-              })}
+            <div className="space-y-2.5 mt-2">
+              {tagSections.map(({ dim, tags }) => (
+                <div key={dim.id} className="border-l-2 border-line pl-2.5">
+                  <p className="text-xs font-bold mb-1">{dim.name}<span className="font-normal text-inkmuted"> · {tags.length}</span></p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {tags.map((t) => {
+                      const on = selectedTagIds.includes(t.id)
+                      return (
+                        <button key={t.id} className={`tag-chip ${on ? '!bg-terra !text-white' : ''}`}
+                          onClick={() => setSelectedTagIds((s) => (on ? s.filter((x) => x !== t.id) : [...s, t.id]))}>
+                          {t.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
           {unmatched.length > 0 && (

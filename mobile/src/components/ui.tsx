@@ -17,6 +17,8 @@ import { useThemeSubscription } from '../themeProvider'
 import { colors, TOUCH_HEIGHT } from '../theme'
 import { themedStyles } from '../theme'
 import { syncLabel, syncTone, type SyncStatusLike } from '../features/format'
+import { leafTagsByGroup } from '../features/form'
+import type { TagGroup } from '../features/queries'
 
 export function Card({ children, style }: { children: ReactNode; style?: object }) {
   useThemeSubscription()
@@ -129,6 +131,48 @@ export function Chip({
   )
 }
 
+/**
+ * 分组标签多选（记录 / 编辑 / AI 确认共用）：按维度一组一组从上往下展示，顺序同标签管理页
+ * （`listTagsGrouped`），避免整片摊开漏选。叶子标签才可勾选（有子标签的是分组容器）。
+ */
+export function GroupedTagPicker({
+  groups,
+  selectedIds,
+  onToggle,
+  emptyHint = '还没有标签，可在下方现场新建。',
+}: {
+  groups: TagGroup[]
+  selectedIds: string[]
+  onToggle: (tagId: string) => void
+  emptyHint?: string
+}) {
+  useThemeSubscription()
+  const sections = leafTagsByGroup(groups)
+  if (sections.length === 0) return <Text style={styles.tagPickerEmpty}>{emptyHint}</Text>
+  return (
+    <View style={styles.tagPicker}>
+      {sections.map(({ group, tags }) => (
+        <View key={group.dimension.id} style={styles.tagSection}>
+          <View style={styles.tagSectionHead}>
+            <Text style={styles.tagSectionTitle}>{group.dimension.name}</Text>
+            <Text style={styles.tagSectionCount}>{tags.length}</Text>
+          </View>
+          <View style={styles.tagChipWrap}>
+            {tags.map((tag) => (
+              <Chip
+                key={tag.id}
+                label={tag.name}
+                active={selectedIds.includes(tag.id)}
+                onPress={() => onToggle(tag.id)}
+              />
+            ))}
+          </View>
+        </View>
+      ))}
+    </View>
+  )
+}
+
 export function Stars({
   value,
   editable = false,
@@ -165,11 +209,14 @@ export const MULTILINE_LINE_HEIGHT = 21
 /** 多行框统一行数区间（TASK-UX-01 P1-2）：下限 2 行防塌成一行，上限 3 行封顶。 */
 export const MULTILINE_MIN_LINES = 2
 export const MULTILINE_MAX_LINES = 3
+/** 多行框上下内边距：正文与边框之间留白，末行不贴底（对齐 Web textarea 的呼吸感）。 */
+export const MULTILINE_PAD_V = 12
 
 /**
  * 多行框行数：按 `minHeight` 换算后夹在 2–3 行（`minHeight` 交给 Yoga 兜底，
  * `numberOfLines` 再让 Android 原生 EditText 自己按行数撑高，空值也保底）。
  * 上限 3 行：通用兜底不再出现「默认 96 → 5 行」的偏高口径。
+ * 需要「写多少显示多少」的字段改用 `autoGrow`，不走上限封顶。
  */
 export function multilineLinesFor(minHeight: number): number {
   const lines = Math.round(minHeight / MULTILINE_LINE_HEIGHT)
@@ -187,6 +234,7 @@ export function TextField({
   maxLength,
   minHeight,
   numberOfLines,
+  autoGrow = false,
 }: {
   label?: string
   value: string
@@ -199,9 +247,17 @@ export function TextField({
   minHeight?: number
   /** 多行时的可见行数（Android 原生生效；不传则按 minHeight 推算，统一夹在 2–3 行）。 */
   numberOfLines?: number
+  /**
+   * 多行框随内容自动增高（对齐 Web `useAutoGrow`）：不按 2–3 行封顶，
+   * 长文本（如语音输入的整段感受）整段可见可改，空值仍保底 `minHeight`。
+   */
+  autoGrow?: boolean
 }) {
   useThemeSubscription()
   const multilineHeight = minHeight ?? MULTILINE_MAX_LINES * MULTILINE_LINE_HEIGHT
+  // 内容实际高度由原生回报；autoGrow 时用它撑高（含上下内边距），空值回落 minHeight。
+  const [contentHeight, setContentHeight] = useState<number | null>(null)
+  const grow = multiline && autoGrow
   return (
     <View style={styles.fieldGroup}>
       {label ? <Text style={styles.fieldLabel}>{label}</Text> : null}
@@ -214,8 +270,18 @@ export function TextField({
         multiline={multiline}
         autoFocus={autoFocus}
         maxLength={maxLength}
-        numberOfLines={multiline ? (numberOfLines ?? multilineLinesFor(multilineHeight)) : undefined}
-        style={[styles.input, multiline && { minHeight: multilineHeight, textAlignVertical: 'top', paddingTop: 12 }]}
+        scrollEnabled={grow ? false : undefined}
+        // autoGrow 交给原生按内容撑高，不能再传 numberOfLines（Android setLines 会把高度钉死）。
+        numberOfLines={multiline && !grow ? (numberOfLines ?? multilineLinesFor(multilineHeight)) : undefined}
+        onContentSizeChange={grow ? (e) => setContentHeight(e.nativeEvent.contentSize.height) : undefined}
+        style={[
+          styles.input,
+          multiline && { minHeight: multilineHeight, textAlignVertical: 'top', paddingTop: MULTILINE_PAD_V },
+          grow && { paddingBottom: MULTILINE_PAD_V },
+          grow && contentHeight != null && {
+            height: Math.max(multilineHeight, Math.ceil(contentHeight) + 2 * MULTILINE_PAD_V),
+          },
+        ]}
       />
     </View>
   )
@@ -424,6 +490,13 @@ const styles = themedStyles(() => StyleSheet.create({
   chipText: { fontSize: 13, color: colors.inkMuted },
   chipTextActive: { color: colors.white, fontWeight: '700' },
   chipTextDanger: { color: colors.danger },
+  tagPicker: { gap: 12 },
+  tagPickerEmpty: { fontSize: 12, color: colors.inkMuted },
+  tagSection: { gap: 8, borderLeftWidth: 2, borderLeftColor: colors.line, paddingLeft: 10 },
+  tagSectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  tagSectionTitle: { fontSize: 13, fontWeight: '700', color: colors.ink },
+  tagSectionCount: { fontSize: 12, color: colors.inkMuted },
+  tagChipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   starsRow: { flexDirection: 'row', gap: 2 },
   star: { lineHeight: undefined },
   starOn: { color: colors.terra },
