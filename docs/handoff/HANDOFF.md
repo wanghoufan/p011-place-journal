@@ -11,7 +11,25 @@
 
 ---
 
-## 0. 2026-10-02 收工快照（最新，先读这里）
+## 0.0 2026-10-13 洁癖＋README 收尾（现役，先看这一节）
+
+- **分支已归位**：`master` == `origin/master` == `wanghoufan/master` == 同一提交（09-22 那 25 个提交的落差已消失）。下方 §0 的「分支站错位」叙述是 10-02 历史，不再成立。
+- **README 中英双版重写**：补安卓端（`mobile/`）与双端同构说明；顶部改为四张真实界面图（画廊/记录/找地点/我的，本地 dev 真渲染、纯演示数据），旧 10-07 三张 `screen-0*.png` 已删。闸：`validate_readme.py --ui-product` → `DOCUMENTATION_READY`（0 warning）。
+- **GitHub About 已回读核验**：简介 82 字、homepage 仍为 Vercel（GitHub Pages 实测 404 不填）、topics 补 `expo` `react-native` 共 10 个。仓库当前**无 Release**，README 里不写下载链接。
+- **公开仓收口**：`.gitignore` 的 `*.旧版-2026-09-29` 泛化为 `*.旧版-*`，三份 09-13 迁移备份（AGENTS／USER_MODEL_OVERRIDE／docs/handoff/HANDOFF）移出索引、本地保留。
+- **temp/ 保留项**：`pre-switch-untracked/`（39M，恢复期快照，无独有文件）、`tabbar-zoom*.png`、`ui-*.xml` 等被 §0 与 HANDOFF 叙述引用，留到大阶段收尾再清。
+- **账本存量红灯未代改**：`TASK-MODEL-LOG#1`（`rework` 写成字符串）与 `DISPATCH-LOG#1`（`used=direct`）是历史行，按「不改写历史」保留；本轮新行已过 `check-ledger`。
+
+### 0.0.1 同日追加：发了 v0.1.0 正式包 + 云端权限匿名复测
+
+- **签名换成自建发布密钥**：此前 release 变体签的是 RN 模板里**全世界共用**的那把调试钥匙（证书 `CN=Android Debug`，SHA-1 `5e8f1606…`），按发布规范不能当正式包。新建 `mobile/keystore/release.keystore`（`CN=Place Journal`，有效期 10000 天）＋ `keystore.properties`，`app/build.gradle` 改为「有本地密钥文件就用发布密钥签、没有则回落 debug」。**两个密钥文件已 gitignore，绝不入库；换机或误删会永久断掉后续覆盖安装，必须单独备份。**
+- **v0.1.0 已发布**：tag `v0.1.0`，资产 `PlaceJournal-v0.1.0-universal.apk`（118,391,148 字节，minSdk 24 / targetSdk 36，四 ABI 通用，v2 签名方案）＋ `SHA256SUMS.txt`；sha256 `fc0e3560…b5633`，线上附件回读下载逐字节一致。**未做真机安装烟雾测试**（两台手机当时被并行会话占用，其中一台已装另一签名的同包 App，覆盖安装要卸载＝清数据，没动）。
+- **签名不兼容提醒**：装过旧调试包的设备必须先卸载才能装正式包，卸载会清掉未同步的本机记录——README、Release 说明、站点条目三处都写了。
+- **云端权限匿名复测（只读，用线上包里的公开 anon 密钥）**：9 张业务表匿名读取全部被拒（6 张 HTTP 401 / SQLSTATE 42501，`dimensions`·`shares` 404 PGRST205 未对 anon 暴露）；OpenAPI 匿名可见路径 0；私有媒体桶列举 HTTP 400；`public_share_read(p_slug)` 匿名可调但随机 slug 返回 `null`（不可枚举）。→ 9 月治理记录今天仍成立，访客打开线上站只会看到演示数据（全新浏览器实测截图：`docs/qa/evidence-live-visitor-demo.png`）。
+
+---
+
+## 0. 2026-10-02 收工快照（历史追溯）
 
 > 本节由 2026-10-02 一次「安卓端代码丢失 → 找回 → 出包 → 装真机」的操作生成。下方 §0.1/0.2/0.3 是 09-04 的历史快照，保留作追溯，**现役状态一律以本节为准**。
 
