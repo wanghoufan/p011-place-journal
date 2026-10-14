@@ -20,25 +20,28 @@ function state(binding: 'unbound' | 'match' | 'mismatch'): LoginState {
 }
 
 describe('account: 动作可见性（绑定/退出/阻断）', () => {
-  it('未登录或登录态未知：三个动作都不出现', () => {
-    expect(accountActions(null)).toEqual({ showBindOwner: false, showSignOut: false, blocked: false })
+  it('未登录或登录态未知：只给登录入口，绑定/退出/阻断都不出现', () => {
+    expect(accountActions(null)).toEqual({ showLogin: true, showBindOwner: false, showSignOut: false, blocked: false })
     expect(accountActions({ status: 'signed_out' })).toEqual({
+      showLogin: true,
       showBindOwner: false,
       showSignOut: false,
       blocked: false,
     })
   })
 
-  it('已登录且未绑定：只给「确认绑定」，不显示退出', () => {
+  it('已登录且未绑定：不再给登录入口，只给「确认绑定」，不显示退出', () => {
     expect(accountActions(state('unbound'))).toEqual({
+      showLogin: false,
       showBindOwner: true,
       showSignOut: false,
       blocked: false,
     })
   })
 
-  it('绑定匹配：出现退出登录，不再要求绑定', () => {
+  it('绑定匹配：不再给登录入口，出现退出登录，不再要求绑定', () => {
     expect(accountActions(state('match'))).toEqual({
+      showLogin: false,
       showBindOwner: false,
       showSignOut: true,
       blocked: false,
@@ -47,6 +50,7 @@ describe('account: 动作可见性（绑定/退出/阻断）', () => {
 
   it('绑定到别的账号：阻断且不显示绑定按钮（不提供切号绑定路径）', () => {
     expect(accountActions(state('mismatch'))).toEqual({
+      showLogin: false,
       showBindOwner: false,
       showSignOut: true,
       blocked: true,

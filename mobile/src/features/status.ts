@@ -1,7 +1,8 @@
 // 同步状态只读汇总（TASK-DEV-09，Mine / Conflicts 页消费）。
 //
 // 只读本地 SQLite / meta，不触网、不触发同步。同步状态口径：
-//   成功 = last_sync_result；待传 = outbox pending/claimed；失败 = 核心实体 sync_status='failed'；
+//   成功 = last_sync_result；待传 = outbox pending/claimed；失败 = 核心实体 sync_status='failed'
+//   ∪ outbox 中带 last_error 的未停放行（push 失败只落 outbox，见 getSyncSummary 内注释）；
 //   停放 = outbox parked（附 last_error 原文）；冲突 = conflicts status='open'。
 
 import type { SqlDatabase } from '../db/database'
@@ -65,6 +66,16 @@ export function getSyncSummary(db: SqlDatabase): SyncSummary {
       `SELECT id, ${errorSelect} FROM ${table} WHERE sync_status = 'failed' ORDER BY updated_at ASC`,
     )
     for (const row of rows) failedEntities.push({ table, id: row.id, error: row.sync_error })
+  }
+
+  // push 失败只落 outbox.last_error（attempts+1 回 pending），实体 sync_status 不会被标 'failed'；
+  // 把「带失败原文且未停放」的 outbox 行并入失败记录，使 Mine 的失败条数与同步摘要的
+  // 「失败 N 项」（= push.failed）同源一致。parked 行归停放区展示，不重复计入。
+  const failedOps = db.getAllSync<{ op_id: string; kind: string; entity_id: string | null; last_error: string | null }>(
+    "SELECT op_id, kind, entity_id, last_error FROM outbox WHERE status = 'pending' AND last_error IS NOT NULL ORDER BY seq ASC",
+  )
+  for (const row of failedOps) {
+    failedEntities.push({ table: row.kind, id: row.entity_id ?? row.op_id, error: row.last_error })
   }
 
   return {

@@ -284,7 +284,13 @@ export default function MineScreen() {
         <SectionTitle
           right={
             <SyncBadge
-              status={summary.owner && summary.pendingCount + summary.claimedCount === 0 ? 'synced' : 'local'}
+              status={
+                signedInUserId && summary.owner
+                  ? summary.pendingCount + summary.claimedCount + summary.parked.length > 0
+                    ? 'pending'
+                    : 'synced'
+                  : 'local'
+              }
             />
           }
         >
@@ -297,7 +303,9 @@ export default function MineScreen() {
         {configured ? (
           <>
             <View style={styles.actions}>
-              <AppButton label={busy ? '处理中…' : '使用 Google 登录'} onPress={handleLogin} loading={busy} style={styles.grow} />
+              {actions.showLogin ? (
+                <AppButton label={busy ? '处理中…' : '使用 Google 登录'} onPress={handleLogin} loading={busy} style={styles.grow} />
+              ) : null}
               {actions.showSignOut ? (
                 <AppButton label="退出登录" variant="secondary" onPress={handleSignOut} disabled={busy} />
               ) : null}

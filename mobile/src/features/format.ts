@@ -45,6 +45,8 @@ export function syncLabel(status: SyncStatusLike | null | undefined): string {
       return '已同步'
     case 'syncing':
       return '同步中'
+    case 'pending':
+      return '待同步'
     case 'failed':
       return '同步失败'
     case 'conflict':

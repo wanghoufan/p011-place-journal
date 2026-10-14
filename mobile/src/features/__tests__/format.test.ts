@@ -39,10 +39,12 @@ describe('format: 日期与状态', () => {
   it('syncLabel / syncTone 口径', () => {
     expect(syncLabel('local')).toBe('仅本机')
     expect(syncLabel('synced')).toBe('已同步')
+    expect(syncLabel('pending')).toBe('待同步')
     expect(syncLabel('conflict')).toBe('冲突待裁决')
     expect(syncTone('synced')).toBe('ok')
     expect(syncTone('failed')).toBe('warn')
     expect(syncTone('local')).toBe('muted')
+    expect(syncTone('pending')).toBe('muted')
   })
 
   it('starsText 与 truncate', () => {

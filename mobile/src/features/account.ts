@@ -11,6 +11,11 @@ import type { LoginOutcome, LoginState } from '../supabase/auth'
 
 /** 账号区按钮可见性（由登录态＋绑定结论推出）。 */
 export interface AccountActions {
+  /**
+   * 未登录/登录态未知才显示「使用 Google 登录」：已登录（session 已建立）时不再与
+   * 退出/绑定并排——真机复测曾出现登录成功后「使用 Google 登录」与「退出登录」同屏。
+   */
+  showLogin: boolean
   /** 已登录且本机未绑定：显示「确认绑定本机数据」。 */
   showBindOwner: boolean
   /**
@@ -23,12 +28,13 @@ export interface AccountActions {
   blocked: boolean
 }
 
-/** 未登录/未配置时三个动作都不显示（`null` = 登录态未知，按未登录处理）。 */
+/** 按钮可见性由登录态＋绑定结论推出（`null` = 登录态未知，按未登录处理：只显示登录入口）。 */
 export function accountActions(state: LoginState | null): AccountActions {
   if (state?.status !== 'signed_in') {
-    return { showBindOwner: false, showSignOut: false, blocked: false }
+    return { showLogin: true, showBindOwner: false, showSignOut: false, blocked: false }
   }
   return {
+    showLogin: false,
     showBindOwner: state.binding === 'unbound',
     showSignOut: state.binding !== 'unbound',
     blocked: state.binding === 'mismatch',

@@ -8,7 +8,7 @@ import {
   isSyncLocked,
   setBoundOwner,
 } from '../../sync/meta'
-import { createOutbox, type Outbox } from '../../sync/outbox'
+import { createOutbox, MAX_ATTEMPTS, type Outbox } from '../../sync/outbox'
 import {
   createMockPullSource,
   type MockPullSource,
@@ -16,6 +16,7 @@ import {
 } from '../../sync/pull'
 import { createMockTransport, type MockTransport } from '../../sync/transport'
 import { describeOwnerMismatch, describeUnboundHint } from '../account'
+import { getSyncSummary } from '../status'
 import {
   describeSyncEntry,
   runSyncEntry,
@@ -439,5 +440,96 @@ describe('syncEntry: describeSyncEntry 文案分支', () => {
     expect(text).toContain('停放 1 项')
     expect(text).toContain('下行 2 项')
     expect(text).toContain('新增冲突 1 项')
+  })
+})
+
+describe('syncEntry: 失败记录与同步摘要同源一致（真机复测：摘要「失败 2 项」但失败记录 0 条）', () => {
+  it('两条上传失败：摘要「失败 2 项」＝失败记录 2 条，且每条带错误原文', async () => {
+    const { db, outbox } = setup(OWNER)
+    outbox.enqueue({ kind: 'upsert_place', entityId: 'p1' }, { opId: 'A' })
+    outbox.enqueue({ kind: 'upsert_place', entityId: 'p2' }, { opId: 'B' })
+    const transport = createMockTransport((op) => ({ outcome: 'retry', error: `插入失败：${op.entityId}` }))
+    const source = createMockPullSource({})
+
+    const result = await runSyncEntry({
+      db,
+      outbox,
+      loginState: signedIn(OWNER, 'match'),
+      isConfigured: true,
+      createEngines: () => engines(transport, source),
+    })
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') throw new Error('unreachable')
+    const summaryText = describeSyncEntry(result)
+    expect(summaryText).toContain('失败 2 项')
+
+    const summary = getSyncSummary(db)
+    expect(summary.failedEntities).toHaveLength(result.push.failed.length)
+    expect(summary.failedEntities).toHaveLength(2)
+    for (const entity of summary.failedEntities) {
+      expect(entity.error).toContain('插入失败')
+    }
+    expect(getLastSyncResult(db)).toMatchObject({ failed: 2 })
+  })
+
+  it('下一轮重试成功：op 出队，失败记录随之清零', async () => {
+    const { db, outbox } = setup(OWNER)
+    outbox.enqueue({ kind: 'upsert_place', entityId: 'p1' }, { opId: 'A' })
+    const failing = createMockTransport(() => ({ outcome: 'retry', error: 'net down' }))
+
+    const first = await runSyncEntry({
+      db,
+      outbox,
+      loginState: signedIn(OWNER, 'match'),
+      isConfigured: true,
+      createEngines: () => engines(failing, createMockPullSource({})),
+    })
+    expect(first.status).toBe('ok')
+    if (first.status !== 'ok') throw new Error('unreachable')
+    expect(first.push.failed).toEqual(['A'])
+    expect(getSyncSummary(db).failedEntities).toHaveLength(1)
+
+    const retry = createMockTransport(() => ({ outcome: 'ok' }))
+    const second = await runSyncEntry({
+      db,
+      outbox,
+      loginState: signedIn(OWNER, 'match'),
+      isConfigured: true,
+      createEngines: () => engines(retry, createMockPullSource({})),
+    })
+    expect(second.status).toBe('ok')
+    if (second.status !== 'ok') throw new Error('unreachable')
+    expect(second.push.done).toEqual(['A'])
+    expect(getSyncSummary(db).failedEntities).toHaveLength(0)
+  })
+
+  it('达阈值转停放的 op 不计入失败记录（停放区已带 last_error 展示，不与摘要「失败 N 项」重复）', async () => {
+    const { db, outbox } = setup(OWNER)
+    outbox.enqueue({ kind: 'upsert_place', entityId: 'p1' }, { opId: 'A' })
+    const transport = createMockTransport(() => ({ outcome: 'retry', error: '毒丸错误原文' }))
+
+    let last: Awaited<ReturnType<typeof runSyncEntry>> | null = null
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      last = await runSyncEntry({
+        db,
+        outbox,
+        loginState: signedIn(OWNER, 'match'),
+        isConfigured: true,
+        createEngines: () => engines(transport, createMockPullSource({})),
+      })
+    }
+
+    expect(last?.status).toBe('ok')
+    if (last?.status !== 'ok') throw new Error('unreachable')
+    expect(last.push.parked).toEqual(['A'])
+    expect(last.push.failed).toHaveLength(0)
+    expect(describeSyncEntry(last)).toContain('停放 1 项')
+    expect(describeSyncEntry(last)).not.toContain('失败 1 项')
+
+    const summary = getSyncSummary(db)
+    expect(summary.failedEntities).toHaveLength(0)
+    expect(summary.parked).toHaveLength(1)
+    expect(summary.parked[0].lastError).toContain('毒丸错误原文')
   })
 })
