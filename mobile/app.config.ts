@@ -3,14 +3,14 @@ import type { ExpoConfig } from 'expo/config';
 const config: ExpoConfig = {
   name: 'Place Journal',
   slug: 'place-journal',
-  version: '0.1.0',
+  version: '0.1.2',
   orientation: 'portrait',
   icon: './assets/images/icon.png',
   scheme: 'com.wanghoufan.placejournal',
   userInterfaceStyle: 'automatic',
   android: {
     package: 'com.wanghoufan.placejournal',
-    versionCode: 1,
+    versionCode: 3,
     adaptiveIcon: {
       backgroundColor: '#E6F4FE',
       foregroundImage: './assets/images/android-icon-foreground.png',

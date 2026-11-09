@@ -415,7 +415,10 @@ export default function RecordScreen() {
         setSavedEntryId(result.entryId)
         setMessage(`${mediaWarning} 可在记录详情查看已保存内容。`)
       } else {
-        router.replace(`/entry/${result.entryId}`)
+        // 保存后先落回主页（画廊）再把详情压上去。不能直接 replace 到详情：
+        // 那会把根栈里的 (tabs) 换成详情，返回键无路可退，系统直接结束 Activity（真机 Bug：返回即退出应用）。
+        router.navigate('/')
+        router.push(`/entry/${result.entryId}`)
       }
     } catch (error) {
       setMessage(`保存失败：${error instanceof Error ? error.message : String(error)}`)

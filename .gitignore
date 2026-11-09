@@ -45,3 +45,6 @@ temp/
 /scripts/detect-client.sh
 /scripts/check-channel-preflight.sh
 # <<< ORCA 治理块 END <<<
+
+# 本地签名密钥不进版本控制（2026-11-08 踩坑上收 第三批A · F 组）
+mobile/android/app/debug.keystore

@@ -466,14 +466,15 @@ const styles = themedStyles(() => StyleSheet.create({
   placeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   placeRowText: { flex: 1, fontSize: 15, color: colors.ink },
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  // 三列等宽：原来固定 96，三个 96 + 两个 8 间距超出容器宽度，只能排两列（9 张排成 5 行）。
   photoCell: {
-    width: 96,
-    height: 96,
+    width: '31.3%',
+    aspectRatio: 1,
     borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: colors.cardDeep,
   },
-  photo: { width: 96, height: 96 },
+  photo: { width: '100%', height: '100%' },
   coverBadge: {
     position: 'absolute',
     top: 6,

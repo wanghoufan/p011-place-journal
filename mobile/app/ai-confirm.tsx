@@ -246,7 +246,10 @@ export default function AiConfirmScreen() {
       // 记录页在 tab 栈里常驻：置位保存信号，让它回到前台时复位表单，防止重复保存。
       markDraftSaved()
       if (mediaWarning) setMessage(`${mediaWarning} 可在记录详情查看已保存内容。`)
-      router.replace(`/entry/${result.entryId}`)
+      // 同 record.tsx：先退出整理页并落回主页（画廊），再把详情压上去；
+      // 直接 replace 会让根栈只剩详情，返回键无路可退，直接退出应用。
+      router.dismissTo('/')
+      router.push(`/entry/${result.entryId}`)
     } catch (err) {
       setMessage(err instanceof Error ? err.message : String(err))
     } finally {

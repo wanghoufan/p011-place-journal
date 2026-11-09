@@ -99,10 +99,18 @@ export default function FindScreen() {
 
   const hits = useMemo(() => {
     const base = matchEntries(parsed, entries, tags)
-    let out = base
-    // 标签 chips = 独立交集过滤（与自然语言结果叠加，对标 Web Find）。
-    if (pickedTags.length) out = out.filter((h) => pickedTags.every((id) => h.best.tagIds.includes(id)))
-    if (minRating != null) out = out.filter((h) => (h.best.rating ?? 0) >= minRating)
+    if (!pickedTags.length && minRating == null) return base
+    // 标签 chips / 星级 = 逐条记录过滤后按地点重新聚合。
+    // 不能只判断 `h.best`：best 只是该地点最近一次到访，标签可能打在更早的记录上，
+    // 只看 best 会让这些地点筛不出来（真机 Bug：给旧记录打「匹克球」后按该标签筛不到）。
+    const out: Hit[] = []
+    for (const h of base) {
+      const matched = h.entries.filter(
+        (e) =>
+          pickedTags.every((id) => e.tagIds.includes(id)) && (minRating == null || (e.rating ?? 0) >= minRating),
+      )
+      if (matched.length) out.push({ ...h, entries: matched, best: matched[0] })
+    }
     return out
   }, [parsed, entries, tags, pickedTags, minRating])
 
