@@ -38,9 +38,10 @@
 |---|---|---|
 | 1 | OPPO 覆盖安装后「记录」由 9 变 8（地点 8 不变），已排除 pull 删行、迁移 DELETE、签名不符、整包重装 | **待用户确认**缺的第 9 条是否是其在意的记录 |
 | 2 | OPPO 上两条旧测试记录（无图、含 tennis go）去留 | 待用户拍板：`A1` 保留 / `A2` 删除 |
-| 3 | 非本轮改动的脱敏文档（`.workbuddy/memory/2026-09-03.md`、`docs/db/ENV1-…`、`docs/qa/BUGS_DEV-14.md`、`docs/qa/QA-REPORT丨V0.2.md`、`docs/handoff/接续恢复开发提示词丨2026-09-19.md`）仍为未提交状态 | 待确认是否一并入库 |
+| 3 | 历史文档脱敏改动 6 份仍未提交：`.workbuddy/memory/2026-09-03.md`、`docs/db/ENV1-实测记录丨2026-09-04.md`、`docs/qa/BUGS_DEV-14.md`、`docs/qa/QA-REPORT丨V0.2.md`、`docs/handoff/接续恢复开发提示词丨2026-09-19.md`、`docs/handoff/…10-13 丨 L3 产品审查后.md`；另有未跟踪目录 `docs/retrospective/`（2026-10-30） | 待确认是否一并入库 |
 | 4 | 历史遗留：云端 `tag_dimensions`/`tags` 被清导致 `tags_dim_owner_fk`，Note 12 Pro 曾 31 条冲突；根因未单点定死 | 未处理 |
 | 5 | 等用户选自动化候选 `A1/A2`、skill 候选 `S1`（阶段复盘 2026-11-10 提出） | 未选 |
+| 6 | 本轮 commit `7034f0f` 在 `wanghoufan/master`，该分支**未设上游**；push 需用户授权并确认推到哪条远端分支 | 未 push |
 
 ## §4 红线
 
