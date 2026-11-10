@@ -48,3 +48,6 @@ temp/
 
 # 本地签名密钥不进版本控制（2026-11-08 踩坑上收 第三批A · F 组）
 mobile/android/app/debug.keystore
+
+# 本地归档的 release 安装包（体积大，不入库；登记走版本台账）
+artifacts/*.apk
