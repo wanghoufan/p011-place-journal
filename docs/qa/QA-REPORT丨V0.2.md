@@ -3,7 +3,7 @@
 > 基线：`git commit 19eb499`（feat: 记录详情页新增「编辑」功能）
 > 依据：`docs/qa/QA-BASELINE丨V0.2.md`（唯一基线）
 > 应用：http://localhost:5173 ｜ 云端：Supabase `yacgnikzvutbpoqvokth` / Schema `habit_tracker`
-> 测试账号：wanghoufan13@gmail.com ｜ 浏览器：真实 Chrome + CDP(9334)，`navigator.webdriver=false`
+> 测试账号：wang****@gmail.com ｜ 浏览器：真实 Chrome + CDP(9334)，`navigator.webdriver=false`
 > 测试时间：2026-09-03
 
 ## 结论
@@ -37,7 +37,7 @@ QA_V02_PASS
 
 | 项 | 结果 | 证据 |
 |---|---|---|
-| T1 登录态 + 云朵 | ✅ 通过 | 「我的」页已连接 wanghoufan13@gmail.com；截图 `t1-e1-mine-connected.png` |
+| T1 登录态 + 云朵 | ✅ 通过 | 「我的」页已连接 wang****@gmail.com；截图 `t1-e1-mine-connected.png` |
 | T2 重打标签保留 | ✅ 通过 | 「验收测试地点」重打 2~3 标签 → 同步 → 刷新保留；截图 `t2-retag-after-refresh.png` |
 | T3 新建标签 | ✅ 通过 | 1 演示 + 1 新建「验收标签测试A」→ 刷新都在；截图 `t3-after-refresh.png` |
 | T4 删标签 | ✅ 通过 | 删 1 标签 → 刷新消失、其余保留；截图 `t4-removed-after-refresh.png` |

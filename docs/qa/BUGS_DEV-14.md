@@ -104,7 +104,7 @@
 
 ## 真机段（TASK-DEV-14 真机走查，T062 剩余两项前置验证）
 
-- QA：qa（本窗口 adb 直驱；只操作 `indq5xfi6hovay4d`，未碰同机其他设备/其他 App，未卸载任何应用，未改业务代码，未 commit/push，未碰 `Services/`/`DockerData/`/`DockerBackups`；`mobile/.env` 只读未打印）
+- QA：qa（本窗口 adb 直驱；只操作 `indq****`，未碰同机其他设备/其他 App，未卸载任何应用，未改业务代码，未 commit/push，未碰 `Services/`/`DockerData/`/`DockerBackups`；`mobile/.env` 只读未打印）
 - 日期：2026-09-20；Metro 端口 **8083**（现查：8082 被 027 项目占用未动，3000/3100 禁用）；截图/UI dump 只放 `/tmp/dev14_ui*.xml`，未入库
 - **真机段结论：① PASS / ② PASS / ③ PASS / ④ 边界记录（按任务口径不冒认）**
 
@@ -112,7 +112,7 @@
 
 | 项 | 证据摘要 |
 |---|---|
-| `adb -s indq5xfi6hovay4d get-state` | `device` |
+| `adb -s indq**** get-state` | `device` |
 | 目标包已安装 | `package:com.wanghoufan.placejournal` |
 | Metro 8083 | 本轮新起（`npx expo start --port 8083`，PID 71409，`lsof` LISTEN 确认；`curl 127.0.0.1:8083` 返回 500 系 bundler 正常态） |
 | `adb reverse --list` | 原状 `tcp:8083 tcp:8083`；冷启动阶段临时加 `tcp:8081 tcp:8083`（dev-client 默认读 8081，见下），走查结束已 `--remove` 恢复原状 |
